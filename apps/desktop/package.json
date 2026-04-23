@@ -1,0 +1,51 @@
+{
+  "name": "@flujo/desktop",
+  "version": "1.0.0",
+  "description": "FLUJO Finance OS — Desktop App (Windows/Mac/Linux)",
+  "main": "src/main.js",
+  "scripts": {
+    "dev":   "concurrently \"npm run web-dev\" \"wait-on http://localhost:3000 && electron .\"",
+    "build": "next build && electron-builder --win --mac --linux",
+    "web-dev": "cd ../web && npm run dev"
+  },
+  "build": {
+    "appId":       "com.flujo.finance",
+    "productName": "FLUJO Finance OS",
+    "copyright":   "Copyright © 2025 FLUJO",
+    "directories": { "output": "dist" },
+    "files": ["src/**/*", "!node_modules"],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.finance"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "assets/icon.png",
+      "category": "Finance"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "extraResources": [{ "from": "../web/.next", "to": "web/.next" }]
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.3.4"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1",
+    "electron": "^32.0.0",
+    "electron-builder": "^25.1.7",
+    "wait-on": "^8.0.1"
+  }
+}

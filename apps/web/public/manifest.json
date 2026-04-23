@@ -1,0 +1,45 @@
+{
+  "name": "FLUJO Finance OS",
+  "short_name": "FLUJO",
+  "description": "Gestión inteligente de tus finanzas personales",
+  "start_url": "/app/dashboard",
+  "display": "standalone",
+  "background_color": "#0A0F1A",
+  "theme_color": "#10B981",
+  "orientation": "portrait-primary",
+  "categories": ["finance", "productivity"],
+  "lang": "es",
+  "icons": [
+    { "src": "/icons/icon-72.png",   "sizes": "72x72",   "type": "image/png", "purpose": "maskable any" },
+    { "src": "/icons/icon-96.png",   "sizes": "96x96",   "type": "image/png", "purpose": "maskable any" },
+    { "src": "/icons/icon-128.png",  "sizes": "128x128", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/icons/icon-144.png",  "sizes": "144x144", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/icons/icon-152.png",  "sizes": "152x152", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/icons/icon-192.png",  "sizes": "192x192", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/icons/icon-384.png",  "sizes": "384x384", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/icons/icon-512.png",  "sizes": "512x512", "type": "image/png", "purpose": "maskable any" }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/dashboard.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "label": "Dashboard financiero"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nuevo movimiento",
+      "short_name": "Agregar",
+      "description": "Registra un ingreso o egreso rápidamente",
+      "url": "/app/transactions?action=new",
+      "icons": [{ "src": "/icons/shortcut-add.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "/app/dashboard",
+      "icons": [{ "src": "/icons/shortcut-dashboard.png", "sizes": "96x96" }]
+    }
+  ]
+}

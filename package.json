@@ -1,0 +1,15 @@
+{
+  "name": "flujo-finance",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": ["apps/web", "apps/desktop", "packages/*"],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "web": "cd apps/web && npm run dev",
+    "desktop": "cd apps/desktop && npm run dev"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  }
+}
