@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useFinanceStore } from "@/store/useFinanceStore";
-import { PageHeader, EmptyState, ProgressBar } from "@/components/ui";
+import { PageHeader, ProgressBar } from "@/components/ui";
 import AccountModal from "@/components/modals/AccountModal";
 import { formatCurrency } from "@/lib/finance";
 import { Plus, Wallet, AlertTriangle, TrendingUp, MoreVertical } from "lucide-react";
@@ -169,12 +169,18 @@ export default function AccountsPage() {
 
         {/* Estado vacío */}
         {accounts.length === 0 && (
-          <EmptyState
-            icon={<Wallet size={32} />}
-            title="Sin cuentas"
-            message="Crea tu primera cuenta para comenzar a registrar tus movimientos"
-            action={{ label: "Crear cuenta", onClick: handleOpenCreate }}
-          />
+          <div className="card text-center py-12 space-y-4">
+            <div className="flex justify-center">
+              <Wallet size={32} className="text-muted" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-200 mb-1">Sin cuentas</h3>
+              <p className="text-xs text-muted mb-4">Crea tu primera cuenta para comenzar a registrar tus movimientos</p>
+              <button onClick={handleOpenCreate} className="btn-primary text-xs">
+                <Plus size={12} /> Crear cuenta
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Info de auto-eliminación */}
