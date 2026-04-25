@@ -23,7 +23,7 @@ dependencies:
   # UI
   fl_chart: ^0.68.0
   google_fonts: ^6.2.1
-  lucide_icons: ^1.0.0
+  lucide_icons: ^0.257.0
   shimmer: ^3.0.0
   modal_bottom_sheet: ^3.0.0-pre
 

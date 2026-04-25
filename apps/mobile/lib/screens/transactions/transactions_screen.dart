@@ -5,6 +5,7 @@ import '../../providers/finance_provider.dart';
 import '../../services/theme.dart';
 import '../../widgets/common/widgets.dart';
 import '../../models/models.dart';
+import '../../widgets/modals/transfer_modal.dart';
 
 class TransactionsScreen extends ConsumerStatefulWidget {
   const TransactionsScreen({super.key});
@@ -20,8 +21,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(financeProvider);
     final txs = state.transactions.where((t) {
+      if (_filter == 'all') return true;
       if (_filter == 'income'  && t.type != 'income')  return false;
       if (_filter == 'expense' && t.type != 'expense') return false;
+      if (_filter == 'transfer' && t.type != 'transfer') return false;
       if (_searchCtrl.text.isNotEmpty) {
         final q = _searchCtrl.text.toLowerCase();
         return t.detail.toLowerCase().contains(q) ||
@@ -31,13 +34,26 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Movimientos'),
+      appBar: AppBar(
+        title: const Text('Movimientos'),
         actions: [
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.add_circle_outline_rounded, color: kBrand),
-            onPressed: () {},
+            onSelected: (val) {
+              if (val == 'transfer') {
+                showDialog(context: context, builder: (_) => const TransferModal());
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(value: 'transfer', child: Row(children: [
+                Icon(Icons.compare_arrows_rounded, color: kBrand, size: 18),
+                SizedBox(width: 12),
+                Text('Transferencia', style: TextStyle(color: kText, fontSize: 13)),
+              ])),
+            ],
           )
-        ]),
+        ],
+      ),
       body: Column(
         children: [
           // Search & filter bar
@@ -54,7 +70,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              Row(children: ['all', 'income', 'expense'].map((f) => Expanded(
+              Row(children: ['all', 'income', 'expense', 'transfer'].map((f) => Expanded(
                 child: GestureDetector(
                   onTap: () => setState(() => _filter = f),
                   child: Container(
@@ -66,9 +82,17 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
                       border: Border.all(color: _filter == f ? kBrand : kBorder),
                     ),
                     child: Center(child: Text(
-                      {'all': 'Todos', 'income': 'Ingresos', 'expense': 'Egresos'}[f]!,
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500,
-                        color: _filter == f ? kBrand : kMuted),
+                      {
+                        'all': 'Todos',
+                        'income': 'Ingresos',
+                        'expense': 'Egresos',
+                        'transfer': 'Transferencias'
+                      }[f]!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: _filter == f ? kBrand : kMuted
+                      ),
                     )),
                   ),
                 ),
@@ -81,11 +105,17 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(children: [
-              _SummaryChip('${txs.where((t) => t.type == 'income').length} ingresos',
-                fmtCompact(txs.where((t) => t.type == 'income').fold(0.0, (s, t) => s + t.amount)), kBrand),
+              _SummaryChip(
+                '${txs.where((t) => t.type == 'income').length} ingresos',
+                fmtCompact(txs.where((t) => t.type == 'income').fold(0.0, (s, t) => s + t.amount)),
+                kBrand,
+              ),
               const SizedBox(width: 8),
-              _SummaryChip('${txs.where((t) => t.type == 'expense').length} egresos',
-                fmtCompact(txs.where((t) => t.type == 'expense').fold(0.0, (s, t) => s + t.amount)), kRed),
+              _SummaryChip(
+                '${txs.where((t) => t.type == 'expense').length} egresos',
+                fmtCompact(txs.where((t) => t.type == 'expense').fold(0.0, (s, t) => s + t.amount)),
+                kRed,
+              ),
             ]),
           ),
           const SizedBox(height: 8),
@@ -137,7 +167,20 @@ class _TxListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = typeColor(tx.type);
+    Color getColor() {
+      if (tx.type == 'transfer') {
+        return tx.amount > 0 ? kBrand : const Color(0xFFF59E0B);
+      }
+      return typeColor(tx.type);
+    }
+
+    IconData getIcon() {
+      if (tx.type == 'transfer') {
+        return tx.amount > 0 ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded;
+      }
+      return tx.type == 'income' ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded;
+    }
+
     return Dismissible(
       key: Key(tx.id),
       direction: DismissDirection.endToStart,
@@ -155,25 +198,46 @@ class _TxListTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(children: [
           Container(
-            width: 38, height: 38,
-            decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
-            child: Icon(tx.type == 'income' ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-              color: color, size: 16),
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: getColor().withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(getIcon(), color: getColor(), size: 16),
           ),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(tx.detail, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: kText),
               overflow: TextOverflow.ellipsis),
-            Text('${tx.category?.name ?? ''} · ${tx.account?.name ?? ''}',
+            Text('${tx.type == 'transfer' ? '⇄ Transferencia' : (tx.category?.name ?? '')} · ${tx.account?.name ?? ''}',
               style: const TextStyle(fontSize: 11, color: kMuted)),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('${typeSign(tx.type)}${fmtCompact(tx.amount)}',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
+            Text('${tx.type == 'transfer' ? (tx.amount > 0 ? '+' : '') : typeSign(tx.type)}${fmtCompact(tx.amount)}',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: getColor())),
             Text(fmtDate(tx.transactionDate), style: const TextStyle(fontSize: 10, color: kMuted)),
           ]),
         ]),
       ),
     );
+  }
+}
+
+Color typeColor(String type) {
+  switch (type) {
+    case 'income': return kBrand;
+    case 'expense': return kRed;
+    case 'transfer': return kBrand;
+    default: return kMuted;
+  }
+}
+
+String typeSign(String type) {
+  switch (type) {
+    case 'income': return '+';
+    case 'expense': return '-';
+    case 'transfer': return '';
+    default: return '';
   }
 }
