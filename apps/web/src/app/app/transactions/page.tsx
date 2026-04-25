@@ -10,9 +10,9 @@ import toast from "react-hot-toast";
 
 export default function TransactionsPage() {
   const [showModal, setShowModal] = useState(false);
-  const [modalType, setModalType] = useState<"income" | "expense">("income");
+  const [modalType, setModalType] = useState<"income" | "expense" | "transfer">("income");
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "income" | "expense">("all");
+  const [filter, setFilter] = useState<"all" | "income" | "expense" | "transfer">("all");
   const [acctFilter, setAcctFilter] = useState("all");
 
   const { transactions, accounts, deleteTransaction } = useFinanceStore();
@@ -34,7 +34,7 @@ export default function TransactionsPage() {
   }, [transactions, filter, acctFilter, search]);
 
   const totalIncome  = filtered.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
-  const totalExpense = filtered.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const totalExpense = filtered.filter(t => t.type === "expense").reduce((s, t) => s + Math.abs(t.amount), 0);
 
   const handleDelete = async (t: Transaction) => {
     if (!confirm(`¿Eliminar "${t.detail}"?`)) return;
@@ -42,7 +42,7 @@ export default function TransactionsPage() {
     toast.success("Movimiento eliminado");
   };
 
-  const openModal = (type: "income" | "expense") => {
+  const openModal = (type: "income" | "expense" | "transfer") => {
     setModalType(type);
     setShowModal(true);
   };
@@ -57,9 +57,19 @@ export default function TransactionsPage() {
             <button onClick={() => openModal("income")} className="btn-outline flex items-center gap-2">
               <Plus size={14} /> Ingreso
             </button>
-            <button onClick={() => openModal("expense")} className="btn-primary flex items-center gap-2"
-              style={{ background: "#ef4444" }}>
+            <button
+              onClick={() => openModal("expense")}
+              className="btn-primary flex items-center gap-2"
+              style={{ background: "#ef4444" }}
+            >
               <Plus size={14} /> Egreso
+            </button>
+            <button
+              onClick={() => openModal("transfer")}
+              className="btn-primary flex items-center gap-2"
+              style={{ background: "#3b82f6" }}
+            >
+              <ArrowLeftRight size={14} /> Transferencia
             </button>
           </div>
         }
@@ -106,17 +116,22 @@ export default function TransactionsPage() {
         </select>
 
         <div className="flex rounded-xl border border-surface-500 overflow-hidden">
-          {(["all", "income", "expense"] as const).map((f) => (
+          {(["all", "income", "expense", "transfer"] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className="px-4 py-2 text-xs font-medium transition-all duration-150"
               style={{
-                background: filter === f ? "#10b981" : "transparent",
+                background: filter === f
+                  ? f === "income" ? "#10b981"
+                  : f === "expense" ? "#ef4444"
+                  : f === "transfer" ? "#3b82f6"
+                  : "#10b981"
+                  : "transparent",
                 color: filter === f ? "#fff" : "#4a6b8a",
               }}
             >
-              {{ all: "Todos", income: "Ingresos", expense: "Egresos" }[f]}
+              {{ all: "Todos", income: "Ingresos", expense: "Egresos", transfer: "Transferencias" }[f]}
             </button>
           ))}
         </div>
@@ -124,7 +139,6 @@ export default function TransactionsPage() {
 
       {/* Table */}
       <div className="card overflow-hidden p-0">
-        {/* Header */}
         <div className="grid grid-cols-[120px_1fr_160px_130px_110px_44px] gap-4 px-5 py-3 border-b border-surface-500 bg-surface-800">
           {["Fecha", "Descripción / Categoría", "Cuenta", "Monto", "Tipo", ""].map((h) => (
             <span key={h} className="text-[10px] font-semibold text-muted uppercase tracking-wider">{h}</span>
@@ -161,13 +175,29 @@ export default function TransactionsPage() {
 
                 <p
                   className="text-sm font-bold"
-                  style={{ color: t.type === "income" ? "#10b981" : "#ef4444" }}
+                  style={{
+                    color: t.type === "income" ? "#10b981"
+                      : t.type === "transfer" && t.amount > 0 ? "#3b82f6"
+                      : t.type === "transfer" && t.amount < 0 ? "#f59e0b"
+                      : "#ef4444"
+                  }}
                 >
-                  {t.type === "income" ? "+" : "-"}
-                  {formatCurrency(t.amount)}
+                  {t.type === "income" ? "+" : t.type === "transfer" && t.amount > 0 ? "+" : "-"}
+                  {formatCurrency(Math.abs(t.amount))}
                 </p>
 
-                <TypeTag type={t.type} />
+                <div>
+                  {t.type === "transfer" ? (
+                    <span
+                      className="px-2 py-1 rounded-full text-[10px] font-semibold"
+                      style={{ background: "rgba(59,130,246,0.15)", color: "#3b82f6" }}
+                    >
+                      ⇄ Transferencia
+                    </span>
+                  ) : (
+                    <TypeTag type={t.type} />
+                  )}
+                </div>
 
                 <button
                   onClick={() => handleDelete(t)}

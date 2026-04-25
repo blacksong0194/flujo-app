@@ -96,7 +96,7 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     ] = await Promise.all([
       supabase.from("accounts").select("*").eq("user_id", user.id).eq("is_active", true).order("name"),
       supabase.from("categories").select("*").eq("user_id", user.id).order("name"),
-      supabase.from("transactions").select("*, account:accounts(*), category:categories(*)").eq("user_id", user.id).order("transaction_date", { ascending: false }).limit(500),
+      supabase.from("transactions").select("*, account:accounts(*), category:categories(*)").eq("user_id", user.id).order("created_at", { ascending: false }).limit(500),
       supabase.from("budgets").select("*, category:categories(*)").eq("user_id", user.id),
       supabase.from("goals").select("*").eq("user_id", user.id).order("created_at"),
     ]);
@@ -116,27 +116,174 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data } = await supabase
-      .from("transactions")
-      .insert({ ...txData, user_id: user.id })
-      .select("*, account:accounts(*), category:categories(*)")
-      .single();
-    if (data) {
-      set((s) => ({ transactions: [data as unknown as Transaction, ...s.transactions] }));
-      // Update account balance
-      const store = get();
-      const account = store.accounts.find(a => a.id === txData.account_id);
-      if (account) {
-        const newBalance = txData.type === "income"
-          ? account.balance + txData.amount
-          : account.balance - txData.amount;
-        await supabase.from("accounts").update({ balance: newBalance }).eq("id", account.id);
-        set((s) => ({
-          accounts: s.accounts.map(a => a.id === account.id ? { ...a, balance: newBalance } : a)
-        }));
+
+    const store = get();
+
+    // Manejar transferencias especialmente
+    if (txData.type === "transfer") {
+      // Crear transacción de salida
+      const { data: outData } = await supabase
+        .from("transactions")
+        .insert({ ...txData, user_id: user.id })
+        .select("*, account:accounts(*), category:categories(*)")
+        .single();
+
+      if (outData) {
+        // Actualizar balance de cuenta de salida
+        const fromAccount = store.accounts.find(a => a.id === txData.account_id);
+        if (fromAccount) {
+          const newFromBalance = fromAccount.balance + txData.amount; // amount es negativo
+          await supabase.from("accounts").update({ balance: newFromBalance }).eq("id", fromAccount.id);
+        }
+
+        // Crear transacción de entrada en cuenta destino
+        const toAccountId = (txData as any).to_account_id;
+        const { data: inData } = await supabase
+          .from("transactions")
+          .insert({
+            account_id: toAccountId,
+            user_id: user.id,
+            amount: Math.abs(txData.amount),
+            type: "transfer",
+            detail: txData.detail,
+            transaction_date: txData.transaction_date,
+            category_id: null,
+            is_recurring: false,
+          })
+          .select("*, account:accounts(*), category:categories(*)")
+          .single();
+
+        if (inData) {
+          // Actualizar balance de cuenta de entrada
+          const toAccount = store.accounts.find(a => a.id === toAccountId);
+          if (toAccount) {
+            const newToBalance = toAccount.balance + Math.abs(txData.amount);
+            await supabase.from("accounts").update({ balance: newToBalance }).eq("id", toAccount.id);
+          }
+
+          // Actualizar estado con ambas transacciones
+          set((s) => ({
+            transactions: [inData as unknown as Transaction, outData as unknown as Transaction, ...s.transactions],
+            accounts: s.accounts.map(a => {
+              if (a.id === txData.account_id) {
+                return { ...a, balance: store.accounts.find(x => x.id === a.id)?.balance ?? 0 + txData.amount };
+              }
+              if (a.id === toAccountId) {
+                return { ...a, balance: store.accounts.find(x => x.id === a.id)?.balance ?? 0 + Math.abs(txData.amount) };
+              }
+              return a;
+            })
+          }));
+        }
       }
-      get().recompute();
+    } else {
+      // Transacciones normales (ingreso/egreso)
+      const { data } = await supabase
+        .from("transactions")
+        .insert({ ...txData, user_id: user.id })
+        .select("*, account:accounts(*), category:categories(*)")
+        .single();
+
+      if (data) {
+        set((s) => ({ transactions: [data as unknown as Transaction, ...s.transactions] }));
+
+        // Update account balance
+        const account = store.accounts.find(a => a.id === txData.account_id);
+        if (account) {
+          const newBalance = txData.type === "income"
+            ? account.balance + txData.amount
+            : account.balance - txData.amount;
+          await supabase.from("accounts").update({ balance: newBalance }).eq("id", account.id);
+          set((s) => ({
+            accounts: s.accounts.map(a => a.id === account.id ? { ...a, balance: newBalance } : a)
+          }));
+        }
+      }
     }
+
+    get().recompute();
+  },
+addTransaction: async (txData) => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const store = get();
+
+    // Manejar transferencias especialmente
+    if (txData.type === "transfer") {
+      // Crear transacción de salida
+      const { data: outData } = await supabase
+        .from("transactions")
+        .insert({ ...txData, user_id: user.id })
+        .select("*, account:accounts(*), category:categories(*)")
+        .single();
+
+      if (outData) {
+        // Actualizar balance de cuenta de salida
+        const fromAccount = store.accounts.find(a => a.id === txData.account_id);
+        if (fromAccount) {
+          const newFromBalance = fromAccount.balance + txData.amount;
+          await supabase.from("accounts").update({ balance: newFromBalance }).eq("id", fromAccount.id);
+        }
+
+        // Crear transacción de entrada en cuenta destino
+        const toAccountId = (txData as any).to_account_id;
+        const { data: inData } = await supabase
+          .from("transactions")
+          .insert({
+            account_id: toAccountId,
+            user_id: user.id,
+            amount: Math.abs(txData.amount),
+            type: "transfer",
+            detail: txData.detail,
+            transaction_date: txData.transaction_date,
+            category_id: null,
+            is_recurring: false,
+          })
+          .select("*, account:accounts(*), category:categories(*)")
+          .single();
+
+        if (inData) {
+          const toAccount = store.accounts.find(a => a.id === toAccountId);
+          if (toAccount) {
+            const newToBalance = toAccount.balance + Math.abs(txData.amount);
+            await supabase.from("accounts").update({ balance: newToBalance }).eq("id", toAccount.id);
+          }
+
+          set((s) => ({
+            transactions: [inData as unknown as Transaction, outData as unknown as Transaction, ...s.transactions],
+            accounts: s.accounts.map(a => {
+              if (a.id === txData.account_id) return { ...a, balance: (store.accounts.find(x => x.id === a.id)?.balance ?? 0) + txData.amount };
+              if (a.id === toAccountId) return { ...a, balance: (store.accounts.find(x => x.id === a.id)?.balance ?? 0) + Math.abs(txData.amount) };
+              return a;
+            })
+          }));
+        }
+      }
+    } else {
+      const { data } = await supabase
+        .from("transactions")
+        .insert({ ...txData, user_id: user.id })
+        .select("*, account:accounts(*), category:categories(*)")
+        .single();
+
+      if (data) {
+        set((s) => ({ transactions: [data as unknown as Transaction, ...s.transactions] }));
+        const account = store.accounts.find(a => a.id === txData.account_id);
+        if (account) {
+          const newBalance = txData.type === "income"
+            ? account.balance + txData.amount
+            : account.balance - txData.amount;
+          await supabase.from("accounts").update({ balance: newBalance }).eq("id", account.id);
+          set((s) => ({
+            accounts: s.accounts.map(a => a.id === account.id ? { ...a, balance: newBalance } : a)
+          }));
+        }
+      }
+    }
+
+    get().recompute();
   },
 
   updateTransaction: async (id, txData) => {
