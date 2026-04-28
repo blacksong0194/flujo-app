@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_INCOME_CATEGORIES, DEFAULT_EXPENSE_CATEGORIES, CATEGORY_COLORS } from "@/lib/utils";
 import { useFinanceStore } from "@/store/useFinanceStore";
+import { ExportModal } from "@/components/modals/ExportModal";
 import type { Category } from "@/types";
 import toast from "react-hot-toast";
 
@@ -162,6 +163,7 @@ export default function SettingsPage() {
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [confirmModal, setConfirmModal] = useState<null | { title: string; message: string; confirmLabel: string; confirmColor: string; onConfirm: () => Promise<void>; }>(null);
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -200,48 +202,8 @@ export default function SettingsPage() {
     else { toast.success("Categoría eliminada"); fetchAll(); }
   };
 
-  // ── Exportar JSON ────────────────────────────────────────────────────────────
-  const exportJSON = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const [{ data: txs }, { data: accs }, { data: cats }, { data: budgets }, { data: goals }] = await Promise.all([
-      supabase.from("transactions").select("*").eq("user_id", user.id),
-      supabase.from("accounts").select("*").eq("user_id", user.id),
-      supabase.from("categories").select("*").eq("user_id", user.id),
-      supabase.from("budgets").select("*").eq("user_id", user.id),
-      supabase.from("goals").select("*").eq("user_id", user.id),
-    ]);
-    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), accounts: accs, categories: cats, transactions: txs, budgets, goals }, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `flujo-export-${new Date().toISOString().slice(0,10)}.json`; a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Datos exportados en JSON");
-  };
-
-  // ── Exportar Excel ───────────────────────────────────────────────────────────
-  const exportExcel = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: txs } = await supabase.from("transactions").select("*, account:accounts(name), category:categories(name)").eq("user_id", user.id).order("transaction_date", { ascending: false });
-    if (!txs || txs.length === 0) { toast.error("No hay movimientos para exportar"); return; }
-
-    // Construir CSV (compatible con Excel)
-    const headers = ["Fecha","Detalle","Tipo","Monto","Cuenta","Categoría"];
-    const rows = (txs as { transaction_date: string; detail: string; type: string; amount: number; account?: { name: string }; category?: { name: string } }[]).map((t) => [
-      t.transaction_date,
-      `"${t.detail.replace(/"/g, '""')}"`,
-      t.type === "income" ? "Ingreso" : t.type === "expense" ? "Egreso" : "Transferencia",
-      t.amount,
-      `"${(t.account as { name: string } | undefined)?.name ?? ""}"`,
-      `"${(t.category as { name: string } | undefined)?.name ?? ""}"`,
-    ]);
-    const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `flujo-movimientos-${new Date().toISOString().slice(0,10)}.csv`; a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Movimientos exportados — ábrelo con Excel");
-  };
+  // ── Exportar — delega al ExportModal ────────────────────────────────────────
+  const openExportModal = () => setShowExportModal(true);
 
   // ── Eliminar todos los movimientos ──────────────────────────────────────────
   const deleteAllTransactions = async () => {
@@ -271,6 +233,9 @@ export default function SettingsPage() {
       )}
       {confirmModal && (
         <ConfirmModal {...confirmModal} onClose={() => setConfirmModal(null)} />
+      )}
+      {showExportModal && (
+        <ExportModal onClose={() => setShowExportModal(false)} />
       )}
 
       <PageHeader title="Ajustes" subtitle="Configura tu experiencia en FLUJO" />
@@ -412,22 +377,10 @@ export default function SettingsPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between py-3 border-b border-surface-500">
               <div>
-                <span className="text-sm text-slate-400">Exportar todos mis datos (JSON)</span>
-                <p className="text-xs text-muted mt-0.5">Cuentas, categorías, movimientos, presupuestos y metas</p>
+                <span className="text-sm text-slate-400">Exportar reporte financiero</span>
+                <p className="text-xs text-muted mt-0.5">Excel multi-hoja o JSON · elige período</p>
               </div>
-              <button onClick={exportJSON}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all"
-                style={{ borderColor: "#3b82f650", color: "#3b82f6", background: "#3b82f610" }}>
-                Exportar
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between py-3 border-b border-surface-500">
-              <div>
-                <span className="text-sm text-slate-400">Exportar como Excel (.xlsx)</span>
-                <p className="text-xs text-muted mt-0.5">{transactions.length} movimientos · compatible con Excel y Google Sheets</p>
-              </div>
-              <button onClick={exportExcel}
+              <button onClick={openExportModal}
                 className="text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all"
                 style={{ borderColor: "#10b98150", color: "#10b981", background: "#10b98110" }}>
                 Exportar
