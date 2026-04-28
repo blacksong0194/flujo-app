@@ -19,11 +19,11 @@ class Account {
   });
 
   factory Account.fromJson(Map<String, dynamic> j) => Account(
-    id:       j['id'],
-    userId:   j['user_id'],
-    name:     j['name'],
-    type:     j['type'],
-    balance:  (j['balance'] as num).toDouble(),
+    id:       j['id'] ?? '',
+    userId:   j['user_id'] ?? '',
+    name:     j['name'] ?? '',
+    type:     j['type'] ?? 'cuenta',
+    balance:  (j['balance'] as num? ?? 0).toDouble(),
     color:    j['color'] ?? '#10b981',
     isActive: j['is_active'] ?? true,
   );
@@ -57,10 +57,10 @@ class Category {
   });
 
   factory Category.fromJson(Map<String, dynamic> j) => Category(
-    id:           j['id'],
-    userId:       j['user_id'],
-    name:         j['name'],
-    movementType: j['movement_type'],
+    id:           j['id'] ?? '',
+    userId:       j['user_id'] ?? '',
+    name:         j['name'] ?? '',
+    movementType: j['movement_type'] ?? 2,
     icon:         j['icon'] ?? '💰',
     color:        j['color'] ?? '#10b981',
   );
@@ -95,14 +95,14 @@ class Transaction {
   });
 
   factory Transaction.fromJson(Map<String, dynamic> j) => Transaction(
-    id:              j['id'],
-    userId:          j['user_id'],
-    accountId:       j['account_id'],
-    categoryId:      j['category_id'],
-    amount:          (j['amount'] as num).toDouble(),
-    detail:          j['detail'],
-    transactionDate: DateTime.parse(j['transaction_date']),
-    type:            j['type'],
+    id:              j['id'] ?? '',
+    userId:          j['user_id'] ?? '',
+    accountId:       j['account_id'] ?? '',
+    categoryId:      j['category_id'] ?? '',
+    amount:          (j['amount'] as num? ?? 0).toDouble(),
+    detail:          j['detail'] ?? '',
+    transactionDate: j['transaction_date'] != null ? DateTime.parse(j['transaction_date']) : DateTime.now(),
+    type:            j['type'] ?? 'expense',
     isRecurring:     j['is_recurring'] ?? false,
     account:  j['account']  != null ? Account.fromJson(j['account'])   : null,
     category: j['category'] != null ? Category.fromJson(j['category']) : null,
@@ -140,10 +140,10 @@ class Budget {
   });
 
   factory Budget.fromJson(Map<String, dynamic> j) => Budget(
-    id:             j['id'],
-    userId:         j['user_id'],
-    categoryId:     j['category_id'],
-    amount:         (j['amount'] as num).toDouble(),
+    id:             j['id'] ?? '',
+    userId:         j['user_id'] ?? '',
+    categoryId:     j['category_id'] ?? '',
+    amount:         (j['amount'] as num? ?? 0).toDouble(),
     period:         j['period'] ?? 'monthly',
     alertAtPercent: j['alert_at_percent'] ?? 80,
     category: j['category'] != null ? Category.fromJson(j['category']) : null,
@@ -178,12 +178,12 @@ class Goal {
   bool get isCompleted => currentAmount >= targetAmount;
 
   factory Goal.fromJson(Map<String, dynamic> j) => Goal(
-    id:            j['id'],
-    userId:        j['user_id'],
-    name:          j['name'],
+    id:            j['id'] ?? '',
+    userId:        j['user_id'] ?? '',
+    name:          j['name'] ?? '',
     description:   j['description'],
-    targetAmount:  (j['target_amount'] as num).toDouble(),
-    currentAmount: (j['current_amount'] as num).toDouble(),
+    targetAmount:  (j['target_amount'] as num? ?? 0).toDouble(),
+    currentAmount: (j['current_amount'] as num? ?? 0).toDouble(),
     targetDate:    j['target_date'] != null ? DateTime.parse(j['target_date']) : null,
     color:         j['color'] ?? '#10b981',
   );
@@ -213,7 +213,7 @@ class MonthlySummary {
     );
     final ing = filtered.where((t) => t.type == 'income').fold(0.0, (s, t) => s + t.amount);
     final egr = filtered.where((t) => t.type == 'expense').fold(0.0, (s, t) => s + t.amount);
-    final aho = (ing - egr).clamp(0, double.infinity);
+    final aho = (ing - egr).clamp(0.0, double.infinity);
     return MonthlySummary(
       ingresos: ing,
       egresos: egr,
@@ -221,4 +221,35 @@ class MonthlySummary {
       tasaAhorro: ing > 0 ? aho / ing : 0,
     );
   }
+}
+
+// --- PendingItem -------------------------------------------------------------
+class PendingItem {
+  final String id;
+  final String userId;
+  final String debtorName;
+  final String description;
+  final double amount;
+  final DateTime dueDate;
+  final String status;
+
+  const PendingItem({
+    required this.id,
+    required this.userId,
+    required this.debtorName,
+    required this.description,
+    required this.amount,
+    required this.dueDate,
+    required this.status,
+  });
+
+  factory PendingItem.fromJson(Map<String, dynamic> j) => PendingItem(
+    id:          j['id'] ?? '',
+    userId:      j['user_id'] ?? '',
+    debtorName:  j['debtor_name'] ?? '',
+    description: j['description'] ?? '',
+    amount:      (j['amount'] as num? ?? 0).toDouble(),
+    dueDate:     j['due_date'] != null ? DateTime.parse(j['due_date']) : DateTime.now(),
+    status:      j['status'] ?? 'pending',
+  );
 }

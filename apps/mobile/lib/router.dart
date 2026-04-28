@@ -11,6 +11,7 @@ import 'screens/budgets/budgets_screen.dart';
 import 'screens/goals/goals_screen.dart';
 import 'screens/reports/reports_screen.dart';
 import 'screens/settings/settings_screen.dart';
+import 'screens/pending/pending_screen.dart';
 import 'widgets/common/main_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -25,17 +26,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      // Auth routes
       GoRoute(path: '/auth/login',    builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/auth/register', builder: (_, __) => const RegisterScreen()),
-
-      // App shell with bottom nav
       ShellRoute(
         builder: (context, state, child) => MainShell(child: child),
         routes: [
           GoRoute(path: '/dashboard',    builder: (_, __) => const DashboardScreen()),
           GoRoute(path: '/transactions', builder: (_, __) => const TransactionsScreen()),
           GoRoute(path: '/accounts',     builder: (_, __) => const AccountsScreen()),
+          GoRoute(path: '/pending',      builder: (_, __) => const PendingScreen()),
           GoRoute(path: '/budgets',      builder: (_, __) => const BudgetsScreen()),
           GoRoute(path: '/goals',        builder: (_, __) => const GoalsScreen()),
           GoRoute(path: '/reports',      builder: (_, __) => const ReportsScreen()),

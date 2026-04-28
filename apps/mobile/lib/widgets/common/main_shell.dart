@@ -7,11 +7,14 @@ class MainShell extends StatelessWidget {
   const MainShell({super.key, required this.child});
 
   static const _tabs = [
-    _Tab('/dashboard',    Icons.grid_view_rounded,    'Inicio'),
-    _Tab('/transactions', Icons.swap_horiz_rounded,   'Movimientos'),
+    _Tab('/dashboard',    Icons.grid_view_rounded,              'Inicio'),
+    _Tab('/transactions', Icons.swap_horiz_rounded,             'Movimientos'),
     _Tab('/accounts',     Icons.account_balance_wallet_rounded, 'Cuentas'),
-    _Tab('/reports',      Icons.bar_chart_rounded,    'Reportes'),
-    _Tab('/settings',     Icons.settings_outlined,    'Ajustes'),
+    _Tab('/pending',      Icons.access_time_rounded,            'Por cobrar'),
+    _Tab('/budgets',      Icons.pie_chart_outline_rounded,      'Presupuesto'),
+    _Tab('/goals',        Icons.track_changes_rounded,          'Metas'),
+    _Tab('/reports',      Icons.bar_chart_rounded,              'Reportes'),
+    _Tab('/settings',     Icons.settings_outlined,              'Ajustes'),
   ];
 
   int _indexFor(String location) {
@@ -24,7 +27,7 @@ class MainShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
-    final index = _indexFor(location);
+    final selectedIndex = _indexFor(location);
 
     return Scaffold(
       body: child,
@@ -33,20 +36,52 @@ class MainShell extends StatelessWidget {
           color: kSurface2,
           border: Border(top: BorderSide(color: kBorder)),
         ),
-        child: BottomNavigationBar(
-          currentIndex: index,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          selectedItemColor: kBrand,
-          unselectedItemColor: kMuted,
-          selectedLabelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-          unselectedLabelStyle: const TextStyle(fontSize: 10),
-          type: BottomNavigationBarType.fixed,
-          onTap: (i) => context.go(_tabs[i].path),
-          items: _tabs.map((t) => BottomNavigationBarItem(
-            icon: Icon(t.icon, size: 22),
-            label: t.label,
-          )).toList(),
+        child: SafeArea(
+          child: SizedBox(
+            height: 60,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              itemCount: _tabs.length,
+              itemBuilder: (context, i) {
+                final tab = _tabs[i];
+                final isSelected = i == selectedIndex;
+                return GestureDetector(
+                  onTap: () => context.go(tab.path),
+                  child: Container(
+                    width: 80,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(tab.icon, size: 22, color: isSelected ? kBrand : kMuted),
+                        const SizedBox(height: 3),
+                        Text(tab.label,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                            color: isSelected ? kBrand : kMuted,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 2),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          height: 2,
+                          width: isSelected ? 20 : 0,
+                          decoration: BoxDecoration(
+                            color: kBrand,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
