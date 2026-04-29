@@ -42,13 +42,25 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
             onSelected: (val) {
               if (val == 'transfer') {
                 showDialog(context: context, builder: (_) => const TransferModal());
+              } else if (val == 'income' || val == 'expense') {
+                _showAddTransactionSheet(context, ref, val);
               }
             },
             itemBuilder: (ctx) => [
-              const PopupMenuItem(value: 'transfer', child: Row(children: [
-                Icon(Icons.compare_arrows_rounded, color: kBrand, size: 18),
+              const PopupMenuItem(value: 'income', child: Row(children: [
+                Icon(Icons.arrow_upward_rounded, color: Color(0xFF10B981), size: 18),
                 SizedBox(width: 12),
-                Text('Transferencia', style: TextStyle(color: kText, fontSize: 13)),
+                Text('Ingreso', style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 13)),
+              ])),
+              const PopupMenuItem(value: 'expense', child: Row(children: [
+                Icon(Icons.arrow_downward_rounded, color: Color(0xFFEF4444), size: 18),
+                SizedBox(width: 12),
+                Text('Egreso', style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 13)),
+              ])),
+              const PopupMenuItem(value: 'transfer', child: Row(children: [
+                Icon(Icons.compare_arrows_rounded, color: Color(0xFF10B981), size: 18),
+                SizedBox(width: 12),
+                Text('Transferencia', style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 13)),
               ])),
             ],
           )
@@ -152,14 +164,18 @@ class _SummaryChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color.withOpacity(0.2)),
       ),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(label, style: TextStyle(fontSize: 11, color: color.withOpacity(0.8))),
-        Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
-      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontSize: 11, color: color.withOpacity(0.8)),
+            overflow: TextOverflow.ellipsis),
+          Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
+            overflow: TextOverflow.ellipsis),
+        ],
+      ),
     ),
   );
 }
-
 class _TxListTile extends StatelessWidget {
   final Transaction tx;
   final VoidCallback onDelete;
@@ -214,7 +230,7 @@ class _TxListTile extends StatelessWidget {
               style: const TextStyle(fontSize: 11, color: kMuted)),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('${tx.type == 'transfer' ? (tx.amount > 0 ? '+' : '') : typeSign(tx.type)}${fmtCompact(tx.amount)}',
+            Text('${tx.amount >= 0 ? '+' : ''}${fmtCompact(tx.amount)}',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: getColor())),
             Text(fmtDate(tx.transactionDate), style: const TextStyle(fontSize: 10, color: kMuted)),
           ]),
@@ -239,5 +255,161 @@ String typeSign(String type) {
     case 'expense': return '-';
     case 'transfer': return '';
     default: return '';
+  }
+}
+
+void _showAddTransactionSheet(BuildContext context, WidgetRef ref, [String type = 'income']) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: const Color(0xFF111827),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (ctx) => _AddTxSheet(ref: ref, initialType: type),
+  );
+}
+
+class _AddTxSheet extends ConsumerStatefulWidget {
+  final WidgetRef ref;
+  final String initialType;
+  const _AddTxSheet({required this.ref, this.initialType = 'income'});
+  @override
+  ConsumerState<_AddTxSheet> createState() => _AddTxSheetState();
+}
+
+class _AddTxSheetState extends ConsumerState<_AddTxSheet> {
+  late String _type;
+  final _detailCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
+  String? _categoryId;
+  String? _accountId;
+  DateTime _date = DateTime.now();
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _type = widget.initialType;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(financeProvider);
+    final cats = state.categories.where((c) =>
+      _type == 'income' ? c.movementType == 1 : c.movementType == 2).toList();
+    final accounts = state.accounts.where((a) => a.isActive).toList();
+    final accent = _type == 'income' ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(child: Container(width: 36, height: 4,
+            decoration: BoxDecoration(color: const Color(0xFF1E2A3A), borderRadius: BorderRadius.circular(4)))),
+          const SizedBox(height: 16),
+          const Text('Nuevo movimiento', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFFE2E8F0))),
+          const SizedBox(height: 16),
+          Row(children: ['income', 'expense'].map((t) => Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() { _type = t; _categoryId = null; }),
+              child: Container(
+                margin: EdgeInsets.only(right: t == 'income' ? 6 : 0),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _type == t ? (t == 'income' ? const Color(0xFF10B981) : const Color(0xFFEF4444)) : const Color(0xFF1E2A3A)),
+                  color: _type == t ? (t == 'income' ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withOpacity(0.1) : Colors.transparent,
+                ),
+                child: Center(child: Text(
+                  t == 'income' ? '↑ Ingreso' : '↓ Egreso',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                    color: _type == t ? (t == 'income' ? const Color(0xFF10B981) : const Color(0xFFEF4444)) : const Color(0xFF4A6B8A)),
+                )),
+              ),
+            ),
+          )).toList()),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _amountCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 18, fontWeight: FontWeight.w700),
+            decoration: const InputDecoration(labelText: 'Monto (RD\$)', prefixText: 'RD\$ '),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _detailCtrl,
+            style: const TextStyle(color: Color(0xFFE2E8F0)),
+            decoration: const InputDecoration(labelText: 'Descripción'),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: _categoryId,
+            dropdownColor: const Color(0xFF111827),
+            style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 13),
+            decoration: const InputDecoration(labelText: 'Categoría'),
+            items: cats.map((c) => DropdownMenuItem(
+              value: c.id,
+              child: Text('${c.icon} ${c.name}'),
+            )).toList(),
+            onChanged: (v) => setState(() => _categoryId = v),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: _accountId,
+            dropdownColor: const Color(0xFF111827),
+            style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 13),
+            decoration: const InputDecoration(labelText: 'Cuenta / Almacén'),
+            items: accounts.map((a) => DropdownMenuItem(
+              value: a.id,
+              child: Text(a.name),
+            )).toList(),
+            onChanged: (v) => setState(() => _accountId = v),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: accent),
+              onPressed: _loading ? null : _submit,
+              child: _loading
+                ? const SizedBox(width: 18, height: 18,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Text('Registrar movimiento'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    if (_amountCtrl.text.isEmpty || _categoryId == null || _accountId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Completa todos los campos'), backgroundColor: Color(0xFFEF4444)));
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      await ref.read(financeProvider.notifier).addTransaction({
+        'account_id':       _accountId,
+        'category_id':      _categoryId,
+        'amount': _type == 'expense'
+    ? -double.parse(_amountCtrl.text)
+    : double.parse(_amountCtrl.text),
+        'detail':           _detailCtrl.text,
+        'transaction_date': _date.toIso8601String().split('T')[0],
+        'type':             _type,
+        'is_recurring':     false,
+      });
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: \$e'), backgroundColor: const Color(0xFFEF4444)));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 }

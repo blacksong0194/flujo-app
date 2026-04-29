@@ -149,7 +149,7 @@ class FinanceNotifier extends Notifier<FinanceState> {
       final account = state.accounts.firstWhere((a) => a.id == accountId);
       await _client
           .from('accounts')
-          .update({'balance': account.balance + amount})
+          .update({'balance': (account.balance + amount)})
           .eq('id', accountId);
     }
 
