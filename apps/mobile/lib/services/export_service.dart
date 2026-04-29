@@ -1,170 +1,229 @@
-import 'dart:io';
-import 'package:excel/excel.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:intl/intl.dart';
-import '../models/models.dart';
+import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import '../providers/finance_provider.dart';
 
-enum ExportPeriod { currentMonth, last3Months }
+const _kBg       = PdfColor.fromInt(0xFF0F1117);
+const _kSurface  = PdfColor.fromInt(0xFF1A1D2E);
+const _kSurface2 = PdfColor.fromInt(0xFF141726);
+const _kBrand    = PdfColor.fromInt(0xFF6C63FF);
+const _kGreen    = PdfColor.fromInt(0xFF4CAF82);
+const _kRed      = PdfColor.fromInt(0xFFE05C5C);
+const _kYellow   = PdfColor.fromInt(0xFFFFC857);
+const _kTextMain = PdfColors.white;
+const _kTextSub  = PdfColor.fromInt(0xFF8A8FAD);
 
-class ExportService {
-  static Future<void> exportExcel({
-    required List<Transaction> transactions,
-    required List<Account> accounts,
-    required List<Budget> budgets,
-    required List<Goal> goals,
-    required List<PendingItem> pendingItems,
-    required ExportPeriod period,
-    required int selectedYear,
-    required int selectedMonth,
-  }) async {
-    final now = DateTime.now();
-    final filtered = _filterByPeriod(transactions, period, selectedYear, selectedMonth);
+pw.PageTheme _pageTheme() => pw.PageTheme(
+  pageFormat: PdfPageFormat.a4,
+  margin: const pw.EdgeInsets.all(28),
+  theme: pw.ThemeData.withFont(),
+  buildBackground: (ctx) => pw.Container(color: _kBg),
+);
 
-    final excel = Excel.createExcel();
+String _fmt(double v) =>
+    '\$${v.abs().toStringAsFixed(2).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',')}';
 
-    // -- Hoja 1: Resumen ----------------------------------------------
-    final summary = excel['Resumen'];
-    excel.setDefaultSheet('Resumen');
+String _fmtDate(DateTime d) =>
+    '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
-    _writeHeader(summary, 0, ['FLUJO Finance OS � Reporte Financiero']);
-    _writeHeader(summary, 1, [_periodLabel(period, selectedYear, selectedMonth)]);
-    _writeHeader(summary, 2, ['Generado: ${DateFormat('dd MMM yyyy', 'es').format(now)}']);
-    summary.appendRow([TextCellValue('')]);
+pw.TextStyle _style({double size = 10, PdfColor color = _kTextMain, pw.FontWeight weight = pw.FontWeight.normal}) =>
+    pw.TextStyle(fontSize: size, color: color, fontWeight: weight);
 
-    _writeHeader(summary, 4, ['RESUMEN GENERAL']);
-    summary.appendRow([]);
+pw.Widget _divider() => pw.Container(
+    height: 1, color: _kBrand, margin: const pw.EdgeInsets.symmetric(vertical: 6));
 
-    final ingresos = filtered.where((t) => t.type == 'income').fold(0.0, (s, t) => s + t.amount);
-    final egresos  = filtered.where((t) => t.type == 'expense').fold(0.0, (s, t) => s + t.amount);
-    final ahorrado = (ingresos - egresos).clamp(0.0, double.infinity);
-    final tasaAhorro = ingresos > 0 ? (ahorrado / ingresos * 100) : 0.0;
-    final liquidez = accounts.where((a) => a.type != 'deuda' && a.type != 'prestamo').fold(0.0, (s, a) => s + a.balance);
-    final deuda    = accounts.where((a) => a.type == 'deuda' || a.type == 'prestamo').fold(0.0, (s, a) => s + a.balance.abs());
+pw.Widget _kpiBox(String label, String value, PdfColor valueColor) => pw.Container(
+  padding: const pw.EdgeInsets.all(10),
+  decoration: pw.BoxDecoration(
+    color: _kSurface,
+    borderRadius: pw.BorderRadius.circular(8),
+    border: pw.Border.all(color: _kBrand, width: 0.5),
+  ),
+  child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+    pw.Text(label, style: _style(size: 8, color: _kTextSub)),
+    pw.SizedBox(height: 4),
+    pw.Text(value, style: _style(size: 13, color: valueColor, weight: pw.FontWeight.bold)),
+  ]),
+);
 
-    _writeRow(summary, ['Ingresos del periodo',  'RD\$${_fmt(ingresos)}']);
-    _writeRow(summary, ['Egresos del periodo',   'RD\$${_fmt(egresos)}']);
-    _writeRow(summary, ['Ahorrado',              'RD\$${_fmt(ahorrado)}']);
-    _writeRow(summary, ['Tasa de ahorro',        '${tasaAhorro.toStringAsFixed(1)}%']);
-    _writeRow(summary, ['Balance liquido',       'RD\$${_fmt(liquidez)}']);
-    _writeRow(summary, ['Total deuda',           'RD\$${_fmt(deuda)}']);
-    _writeRow(summary, ['Patrimonio neto',       'RD\$${_fmt(liquidez - deuda)}']);
+pw.Widget _pageHeader(String title, String subtitle) => pw.Column(
+  crossAxisAlignment: pw.CrossAxisAlignment.start,
+  children: [
+    pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+      pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Text('FLUJO', style: _style(size: 22, color: _kBrand, weight: pw.FontWeight.bold)),
+        pw.Text('Finance OS', style: _style(size: 9, color: _kTextSub)),
+      ]),
+      pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+        pw.Text(title, style: _style(size: 16, weight: pw.FontWeight.bold)),
+        pw.Text(subtitle, style: _style(size: 9, color: _kTextSub)),
+      ]),
+    ]),
+    _divider(),
+  ],
+);
 
-    // -- Hoja 2: Movimientos ------------------------------------------
-    final txSheet = excel['Movimientos'];
-    _writeBoldRow(txSheet, ['Fecha', 'Descripcion', 'Categoria', 'Cuenta', 'Tipo', 'Monto (RD\$)']);
-    for (final t in filtered) {
-      txSheet.appendRow([
-        TextCellValue(DateFormat('dd/MM/yyyy').format(t.transactionDate)),
-        TextCellValue(t.detail),
-        TextCellValue(t.category?.name ?? ''),
-        TextCellValue(t.account?.name ?? ''),
-        TextCellValue(t.type == 'income' ? 'Ingreso' : 'Egreso'),
-        DoubleCellValue(t.type == 'income' ? t.amount : -t.amount),
-      ]);
-    }
+pw.Widget _tableHeader(List<String> cols, List<double> flex) => pw.Container(
+  padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+  color: _kBrand,
+  child: pw.Row(children: List.generate(cols.length, (i) =>
+      pw.Expanded(flex: (flex[i] * 10).round(),
+          child: pw.Text(cols[i], style: _style(size: 8, weight: pw.FontWeight.bold))))),
+);
 
-    // -- Hoja 3: Cuentas ----------------------------------------------
-    final accSheet = excel['Cuentas'];
-    _writeBoldRow(accSheet, ['Nombre', 'Tipo', 'Balance (RD\$)', 'Estado']);
-    for (final a in accounts) {
-      accSheet.appendRow([
-        TextCellValue(a.name),
-        TextCellValue(a.type),
-        DoubleCellValue(a.balance),
-        TextCellValue(a.isActive ? 'Activa' : 'Inactiva'),
-      ]);
-    }
-
-    // -- Hoja 4: Presupuestos -----------------------------------------
-    final budSheet = excel['Presupuestos'];
-    _writeBoldRow(budSheet, ['Categoria', 'Limite (RD\$)', 'Periodo', 'Alerta en %']);
-    for (final b in budgets) {
-      budSheet.appendRow([
-        TextCellValue(b.category?.name ?? ''),
-        DoubleCellValue(b.amount),
-        TextCellValue(b.period),
-        IntCellValue(b.alertAtPercent),
-      ]);
-    }
-
-    // -- Hoja 5: Metas ------------------------------------------------
-    final goalSheet = excel['Metas'];
-    _writeBoldRow(goalSheet, ['Nombre', 'Meta (RD\$)', 'Ahorrado (RD\$)', 'Progreso %', 'Fecha limite']);
-    for (final g in goals) {
-      goalSheet.appendRow([
-        TextCellValue(g.name),
-        DoubleCellValue(g.targetAmount),
-        DoubleCellValue(g.currentAmount),
-        DoubleCellValue(g.progressPercent),
-        TextCellValue(g.targetDate != null ? DateFormat('dd/MM/yyyy').format(g.targetDate!) : '�'),
-      ]);
-    }
-
-    // -- Hoja 6: Por cobrar -------------------------------------------
-    final pendSheet = excel['Por cobrar'];
-    _writeBoldRow(pendSheet, ['Deudor', 'Descripcion', 'Monto (RD\$)', 'Vence', 'Estado']);
-    for (final p in pendingItems) {
-      pendSheet.appendRow([
-        TextCellValue(p.debtorName),
-        TextCellValue(p.description),
-        DoubleCellValue(p.amount),
-        TextCellValue(DateFormat('dd/MM/yyyy').format(p.dueDate)),
-        TextCellValue(p.status == 'collected' ? 'Cobrado' : p.status == 'overdue' ? 'Vencido' : 'Pendiente'),
-      ]);
-    }
-
-    // -- Guardar y compartir ------------------------------------------
-    final bytes = excel.encode();
-    if (bytes == null) throw Exception('Error al generar Excel');
-
-    final dir  = await getTemporaryDirectory();
-    final name = 'FLUJO_Reporte_${DateFormat('yyyy_MM').format(now)}.xlsx';
-    final file = File('${dir.path}/$name');
-    await file.writeAsBytes(bytes);
-
-    await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
-      subject: 'Reporte FLUJO Finance OS',
-      text: 'Reporte financiero � ${_periodLabel(period, selectedYear, selectedMonth)}',
+pw.Widget _tableRow(List<String> cells, List<double> flex,
+    {bool odd = true, List<PdfColor?>? colors}) =>
+    pw.Container(
+      padding: const pw.EdgeInsets.symmetric(vertical: 5, horizontal: 8),
+      color: odd ? _kSurface : _kSurface2,
+      child: pw.Row(children: List.generate(cells.length, (i) =>
+          pw.Expanded(flex: (flex[i] * 10).round(),
+              child: pw.Text(cells[i],
+                  style: _style(size: 8,
+                      color: (colors != null && colors[i] != null)
+                          ? colors[i]! : _kTextMain))))),
     );
+
+Future<void> exportToPdf(BuildContext context, FinanceState state, {int months = 1}) async {
+  final now = DateTime.now();
+  final cutoff = DateTime(now.year, now.month - (months - 1), 1);
+
+  final txns = state.transactions
+      .where((t) => t.transactionDate.isAfter(cutoff.subtract(const Duration(days: 1))))
+      .toList()
+    ..sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
+
+  final income  = txns.where((t) => t.type == 'income').fold(0.0, (s, t) => s + t.amount);
+  final expense = txns.where((t) => t.type == 'expense').fold(0.0, (s, t) => s + t.amount);
+  final balance = income - expense;
+  final periodLabel = months == 1
+      ? '${_monthName(now.month)} ${now.year}'
+      : 'Últimos 3 meses';
+
+  final doc = pw.Document();
+
+  // ── Página 1: Movimientos ────────────────────────────────────────────────
+  doc.addPage(pw.MultiPage(
+    pageTheme: _pageTheme(),
+    build: (ctx) => [
+      _pageHeader('Reporte Financiero', periodLabel),
+      pw.SizedBox(height: 12),
+      pw.Row(children: [
+        pw.Expanded(child: _kpiBox('Ingresos',    _fmt(income),     _kGreen)),
+        pw.SizedBox(width: 8),
+        pw.Expanded(child: _kpiBox('Egresos',     _fmt(expense),    _kRed)),
+        pw.SizedBox(width: 8),
+        pw.Expanded(child: _kpiBox('Balance',     _fmt(balance),    balance >= 0 ? _kGreen : _kRed)),
+        pw.SizedBox(width: 8),
+        pw.Expanded(child: _kpiBox('Movimientos', '${txns.length}', _kBrand)),
+      ]),
+      pw.SizedBox(height: 20),
+      pw.Text('Movimientos', style: _style(size: 13, weight: pw.FontWeight.bold)),
+      pw.SizedBox(height: 6),
+      _tableHeader(['Fecha', 'Detalle', 'Categoría', 'Tipo', 'Monto'], [1.2, 2.5, 1.8, 1.0, 1.5]),
+      ...List.generate(txns.length, (i) {
+        final t = txns[i];
+        final isIncome = t.type == 'income';
+        return _tableRow(
+          [_fmtDate(t.transactionDate), t.detail, t.category?.name ?? '—',
+           isIncome ? 'Ingreso' : 'Egreso', _fmt(t.amount)],
+          [1.2, 2.5, 1.8, 1.0, 1.5],
+          odd: i.isOdd,
+          colors: [null, null, null, isIncome ? _kGreen : _kRed, isIncome ? _kGreen : _kRed],
+        );
+      }),
+    ],
+  ));
+
+  // ── Página 2: Presupuestos ───────────────────────────────────────────────
+  if (state.budgets.isNotEmpty) {
+    doc.addPage(pw.MultiPage(
+      pageTheme: _pageTheme(),
+      build: (ctx) => [
+        _pageHeader('Presupuestos', periodLabel),
+        pw.SizedBox(height: 12),
+        _tableHeader(['Categoría', 'Límite', 'Período', 'Alerta %'], [2.5, 2.0, 2.0, 1.5]),
+        ...List.generate(state.budgets.length, (i) {
+          final b = state.budgets[i];
+          return _tableRow(
+            [b.category?.name ?? '—', _fmt(b.amount), b.period, '${b.alertAtPercent}%'],
+            [2.5, 2.0, 2.0, 1.5],
+            odd: i.isOdd,
+          );
+        }),
+      ],
+    ));
   }
 
-  static List<Transaction> _filterByPeriod(
-    List<Transaction> txs, ExportPeriod period, int year, int month) {
-    final now = DateTime.now();
-    if (period == ExportPeriod.currentMonth) {
-      return txs.where((t) =>
-        t.transactionDate.year == year &&
-        t.transactionDate.month == month).toList();
-    } else {
-      final from = DateTime(now.year, now.month - 2, 1);
-      return txs.where((t) => t.transactionDate.isAfter(from.subtract(const Duration(days: 1)))).toList();
-    }
+  // ── Página 3: Por cobrar ─────────────────────────────────────────────────
+  if (state.pendingItems.isNotEmpty) {
+    final totalPending = state.pendingItems
+        .where((p) => p.status != 'collected')
+        .fold(0.0, (s, p) => s + p.amount);
+    doc.addPage(pw.MultiPage(
+      pageTheme: _pageTheme(),
+      build: (ctx) => [
+        _pageHeader('Por Cobrar / Pendientes', periodLabel),
+        pw.SizedBox(height: 8),
+        pw.Row(children: [
+          pw.Expanded(child: _kpiBox('Total pendiente', _fmt(totalPending), _kYellow)),
+          pw.SizedBox(width: 8),
+          pw.Expanded(child: _kpiBox('Cantidad', '${state.pendingItems.length}', _kBrand)),
+        ]),
+        pw.SizedBox(height: 16),
+        _tableHeader(['Deudor', 'Detalle', 'Monto', 'Vence', 'Estado'], [2.0, 2.0, 1.5, 1.5, 1.5]),
+        ...List.generate(state.pendingItems.length, (i) {
+          final p = state.pendingItems[i];
+          final vencido = p.dueDate.isBefore(now);
+          final statusColor = p.status == 'collected' ? _kGreen : vencido ? _kRed : _kYellow;
+          final statusLabel = p.status == 'collected' ? 'Cobrado' : vencido ? 'Vencido' : 'Pendiente';
+          return _tableRow(
+            [p.debtorName, p.description, _fmt(p.amount), _fmtDate(p.dueDate), statusLabel],
+            [2.0, 2.0, 1.5, 1.5, 1.5],
+            odd: i.isOdd,
+            colors: [null, null, _kGreen, null, statusColor],
+          );
+        }),
+      ],
+    ));
   }
 
-  static String _periodLabel(ExportPeriod period, int year, int month) {
-    if (period == ExportPeriod.currentMonth) {
-      return DateFormat('MMMM yyyy', 'es').format(DateTime(year, month));
-    }
-    return 'Ultimos 3 meses';
+  // ── Página 4: Cuentas ────────────────────────────────────────────────────
+  if (state.accounts.isNotEmpty) {
+    final totalBalance = state.accounts.fold(0.0, (s, a) => s + a.balance);
+    doc.addPage(pw.MultiPage(
+      pageTheme: _pageTheme(),
+      build: (ctx) => [
+        _pageHeader('Cuentas', periodLabel),
+        pw.SizedBox(height: 8),
+        pw.Row(children: [
+          pw.Expanded(child: _kpiBox('Balance total', _fmt(totalBalance), totalBalance >= 0 ? _kGreen : _kRed)),
+          pw.SizedBox(width: 8),
+          pw.Expanded(child: _kpiBox('Cuentas', '${state.accounts.length}', _kBrand)),
+        ]),
+        pw.SizedBox(height: 16),
+        _tableHeader(['Nombre', 'Tipo', 'Color', 'Balance'], [2.5, 2.0, 1.5, 2.0]),
+        ...List.generate(state.accounts.length, (i) {
+          final a = state.accounts[i];
+          return _tableRow(
+            [a.name, a.type, a.color, _fmt(a.balance)],
+            [2.5, 2.0, 1.5, 2.0],
+            odd: i.isOdd,
+            colors: [null, null, null, a.balance >= 0 ? _kGreen : _kRed],
+          );
+        }),
+      ],
+    ));
   }
 
-  static String _fmt(double v) => NumberFormat('#,##0.00').format(v);
-
-  static void _writeHeader(Sheet sheet, int row, List<String> values) {
-    while (sheet.maxRows <= row) sheet.appendRow([TextCellValue('')]);
-    for (int i = 0; i < values.length; i++) {
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: row))
-        .value = TextCellValue(values[i]);
-    }
-  }
-
-  static void _writeRow(Sheet sheet, List<String> values) {
-    sheet.appendRow(values.map((v) => TextCellValue(v)).toList());
-  }
-
-  static void _writeBoldRow(Sheet sheet, List<String> values) {
-    sheet.appendRow(values.map((v) => TextCellValue(v)).toList());
-  }
+  await Printing.layoutPdf(
+    onLayout: (_) async => doc.save(),
+    name: 'flujo_reporte_${now.year}${now.month.toString().padLeft(2, '0')}.pdf',
+  );
 }
+
+String _monthName(int m) => const [
+  '', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+][m];

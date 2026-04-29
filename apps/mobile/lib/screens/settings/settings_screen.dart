@@ -7,6 +7,7 @@ import '../../services/theme.dart';
 import '../../services/export_service.dart';
 import '../../widgets/common/widgets.dart';
 import '../../providers/finance_provider.dart';
+enum ExportPeriod { currentMonth, last3Months }
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -32,7 +33,7 @@ class SettingsScreen extends ConsumerWidget {
 
         const SectionHeader(title: 'Exportar datos'),
         FCard(child: Column(children: [
-          _ActionTile(Icons.table_chart_rounded, 'Exportar como Excel', kBrand, () =>
+          _ActionTile(Icons.picture_as_pdf_rounded, 'Exportar como PDF', kBrand, () =>
             _showExportDialog(context, ref, state)),
         ])),
         const SizedBox(height: 16),
@@ -89,7 +90,7 @@ class _ExportSheetState extends ConsumerState<_ExportSheet> {
         Center(child: Container(width: 36, height: 4,
           decoration: BoxDecoration(color: kBorder, borderRadius: BorderRadius.circular(4)))),
         const SizedBox(height: 20),
-        const Text('Exportar reporte Excel', style: kTitle),
+        const Text('Exportar reporte PDF', style: kTitle),
         const SizedBox(height: 6),
         const Text('El reporte incluye movimientos, cuentas, presupuestos, metas y cobros pendientes.',
           style: TextStyle(color: kMuted, fontSize: 12)),
@@ -118,7 +119,7 @@ class _ExportSheetState extends ConsumerState<_ExportSheet> {
             icon: _loading
               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
               : const Icon(Icons.download_rounded, size: 18),
-            label: Text(_loading ? 'Generando...' : 'Generar y compartir Excel'),
+            label: Text(_loading ? 'Generando...' : 'Generar PDF'),
           ),
         ),
       ]),
@@ -126,18 +127,13 @@ class _ExportSheetState extends ConsumerState<_ExportSheet> {
   }
 
   Future<void> _export() async {
-    setState(() => _loading = true);
-    try {
-      final state = ref.read(financeProvider);
-      await ExportService.exportExcel(
-        transactions: state.transactions,
-        accounts:     state.accounts,
-        budgets:      state.budgets,
-        goals:        state.goals,
-        pendingItems: state.pendingItems,
-        period:       _period,
-        selectedYear:  state.selectedYear,
-        selectedMonth: state.selectedMonth,
+  setState(() => _loading = true);
+  try {
+    final state = ref.read(financeProvider);
+    await exportToPdf(
+        context,
+        state,
+        months: _period == ExportPeriod.currentMonth ? 1 : 3,
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
