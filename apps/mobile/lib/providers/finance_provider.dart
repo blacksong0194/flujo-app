@@ -142,14 +142,23 @@ class FinanceNotifier extends Notifier<FinanceState> {
   Future<void> addTransaction(Map<String, dynamic> data) async {
     final user = _client.auth.currentUser!;
     await _client.from('transactions').insert({...data, 'user_id': user.id});
+
+    final accountId = data['account_id'];
+    final amount = (data['amount'] as num).toDouble();
+    if (accountId != null) {
+      final account = state.accounts.firstWhere((a) => a.id == accountId);
+      await _client
+          .from('accounts')
+          .update({'balance': account.balance + amount})
+          .eq('id', accountId);
+    }
+
     await fetchAll();
   }
 
   Future<void> deleteTransaction(String id) async {
     await _client.from('transactions').delete().eq('id', id);
-    state = state.copyWith(
-      transactions: state.transactions.where((t) => t.id != id).toList(),
-    );
+    await fetchAll();
   }
 
   Future<void> addAccount(Map<String, dynamic> data) async {
@@ -157,7 +166,10 @@ class FinanceNotifier extends Notifier<FinanceState> {
     final res = await _client.from('accounts').insert({...data, 'user_id': user.id}).select().single();
     state = state.copyWith(accounts: [...state.accounts, Account.fromJson(res)]);
   }
-
+Future<void> updateAccount(String id, Map<String, dynamic> data) async {
+  await _client.from('accounts').update(data).eq('id', id);
+  await fetchAll();
+}
   Future<void> updateGoal(String id, double newAmount) async {
     await _client.from('goals').update({'current_amount': newAmount}).eq('id', id);
     state = state.copyWith(
