@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Wallet, ArrowLeftRight, PieChart,
-  Target, BarChart3, Settings, LogOut, TrendingUp, Clock,
+  Target, BarChart3, Settings, LogOut, TrendingUp, Clock, Repeat,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { usePendingStore } from "@/store/usePendingStore";
@@ -15,6 +15,7 @@ const NAV = [
   { href: "/app/accounts",     label: "Cuentas",     icon: Wallet },
   { href: "/app/transactions", label: "Movimientos", icon: ArrowLeftRight },
   { href: "/app/pending",      label: "Por cobrar",  icon: Clock },
+  { href: "/app/recurring",    label: "Recurrentes", icon: Repeat },
   { href: "/app/budgets",      label: "Presupuesto", icon: PieChart },
   { href: "/app/goals",        label: "Metas",       icon: Target },
   { href: "/app/reports",      label: "Reportes",    icon: BarChart3 },

@@ -129,3 +129,22 @@ export interface Alert {
   account_id?: string;
   category_id?: string;
 }
+
+export interface RecurringPayment {
+  id: string;
+  user_id: string;
+  name: string;
+  amount: number;
+  account_id: string;
+  category_id?: string;
+  day_of_month: number;
+  next_payment_date: string;
+  last_executed_date?: string;
+  is_auto: boolean;
+  auto_debit_at?: string;
+  status: 'active' | 'paused' | 'cancelled';
+  debt_account_id?: string;
+  // Joined
+  account?: Account;
+  category?: Category;
+}
