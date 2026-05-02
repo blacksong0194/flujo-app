@@ -11,6 +11,7 @@ class MainShell extends StatelessWidget {
     _Tab('/transactions', Icons.swap_horiz_rounded,             'Movimientos'),
     _Tab('/accounts',     Icons.account_balance_wallet_rounded, 'Cuentas'),
     _Tab('/pending',      Icons.access_time_rounded,            'Por cobrar'),
+    _Tab('/recurring',    Icons.repeat_rounded,                 'Recurrentes'),
     _Tab('/budgets',      Icons.pie_chart_outline_rounded,      'Presupuesto'),
     _Tab('/goals',        Icons.track_changes_rounded,          'Metas'),
     _Tab('/reports',      Icons.bar_chart_rounded,              'Reportes'),

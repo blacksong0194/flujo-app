@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/theme.dart';
 
-// ─── FCard ────────────────────────────────────────────────────────────────────
+// --- FCard --------------------------------------------------------------------
 class FCard extends StatelessWidget {
   final Widget child;
   final EdgeInsets? padding;
@@ -18,11 +18,32 @@ class FCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = Container(
-      decoration: kCardDecoration(borderTop: borderTop),
-      padding: padding ?? const EdgeInsets.all(18),
-      child: child,
+    Widget content = ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        decoration: BoxDecoration(
+          color: kSurface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kBorder, width: 1),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (borderTop != null)
+              Container(height: 3, color: borderTop),
+            Flexible(
+              fit: FlexFit.loose,
+              child: Padding(
+                padding: padding ?? const EdgeInsets.all(18),
+                child: child,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
+
     if (onTap != null) {
       return GestureDetector(onTap: onTap, child: content);
     }
@@ -30,7 +51,7 @@ class FCard extends StatelessWidget {
   }
 }
 
-// ─── MetricCard ───────────────────────────────────────────────────────────────
+// --- MetricCard ---------------------------------------------------------------
 class MetricCard extends StatelessWidget {
   final String label;
   final String value;
@@ -51,24 +72,29 @@ class MetricCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return FCard(
       borderTop: accent,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label.toUpperCase(), style: kCaption),
-              if (icon != null) Icon(icon, size: 15, color: accent),
+              Expanded(
+                child: Text(label.toUpperCase(),
+                  style: kCaption, overflow: TextOverflow.ellipsis),
+              ),
+              if (icon != null) Icon(icon, size: 14, color: accent),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(value, style: TextStyle(
-            fontSize: 20, fontWeight: FontWeight.w700,
+            fontSize: 18, fontWeight: FontWeight.w700,
             color: accent, letterSpacing: -0.5,
           )),
           if (subtitle != null) ...[
-            const SizedBox(height: 3),
-            Text(subtitle!, style: kCaption),
+            const SizedBox(height: 2),
+            Text(subtitle!, style: kCaption, overflow: TextOverflow.ellipsis),
           ],
         ],
       ),
@@ -76,7 +102,7 @@ class MetricCard extends StatelessWidget {
   }
 }
 
-// ─── FProgressBar ─────────────────────────────────────────────────────────────
+// --- FProgressBar -------------------------------------------------------------
 class FProgressBar extends StatelessWidget {
   final double percent;
   final Color? color;
@@ -106,7 +132,7 @@ class FProgressBar extends StatelessWidget {
   }
 }
 
-// ─── TypeBadge ────────────────────────────────────────────────────────────────
+// --- TypeBadge ----------------------------------------------------------------
 class TypeBadge extends StatelessWidget {
   final String type;
   const TypeBadge(this.type, {super.key});
@@ -131,7 +157,7 @@ class TypeBadge extends StatelessWidget {
   }
 }
 
-// ─── SectionHeader ────────────────────────────────────────────────────────────
+// --- SectionHeader ------------------------------------------------------------
 class SectionHeader extends StatelessWidget {
   final String title;
   final String? action;
@@ -163,7 +189,7 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-// ─── AlertBanner ─────────────────────────────────────────────────────────────
+// --- AlertBanner --------------------------------------------------------------
 class AlertBannerWidget extends StatelessWidget {
   final String title;
   final String message;
@@ -205,7 +231,7 @@ class AlertBannerWidget extends StatelessWidget {
   }
 }
 
-// ─── LoadingShimmer ──────────────────────────────────────────────────────────
+// --- LoadingPlaceholder -------------------------------------------------------
 class LoadingPlaceholder extends StatelessWidget {
   const LoadingPlaceholder({super.key});
 

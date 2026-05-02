@@ -27,7 +27,24 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: state.isLoading
+      body: state.error != null
+        ? Center(child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 40),
+                const SizedBox(height: 12),
+                Text('Error: ${state.error}', style: const TextStyle(color: Colors.red, fontSize: 12), textAlign: TextAlign.center),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: () => ref.read(financeProvider.notifier).fetchAll(),
+                  child: const Text('Reintentar'),
+                ),
+              ],
+            ),
+          ))
+        : (state.isLoading && state.accounts.isEmpty)
         ? const LoadingPlaceholder()
         : RefreshIndicator(
             color: kBrand,
@@ -36,20 +53,15 @@ class DashboardScreen extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
               children: [
-                // Period navigation
                 _PeriodNav(state: state, ref: ref),
                 const SizedBox(height: 16),
-
-                // Alerts
                 if (state.totalDebt > 0 && state.totalLiquid > 0)
                   if (state.totalDebt / (state.totalLiquid + state.totalDebt) > 0.85)
                     AlertBannerWidget(
-                      title: 'Ratio de endeudamiento crítico',
-                      message: 'Tu deuda representa más del 85% de tus activos',
+                      title: 'Ratio de endeudamiento critico',
+                      message: 'Tu deuda representa mas del 85% de tus activos',
                       color: kRed,
                     ),
-
-                // KPI grid
                 GridView.count(
                   crossAxisCount: 2,
                   shrinkWrap: true,
@@ -59,7 +71,7 @@ class DashboardScreen extends ConsumerWidget {
                   childAspectRatio: 1.6,
                   children: [
                     MetricCard(
-                      label: 'Balance líquido',
+                      label: 'Balance liquido',
                       value: fmtCompact(state.totalLiquid),
                       accent: state.totalLiquid >= 0 ? kBrand : kRed,
                       icon: Icons.account_balance_wallet_rounded,
@@ -88,15 +100,13 @@ class DashboardScreen extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 20),
-
-                // Distribution card
                 FCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text('Activos vs. Deudas', style: kTitle),
                       const SizedBox(height: 14),
-                      _SimpleBar('Activos líquidos', state.totalLiquid, state.totalLiquid + state.totalDebt, kBrand),
+                      _SimpleBar('Activos liquidos', state.totalLiquid, state.totalLiquid + state.totalDebt, kBrand),
                       const SizedBox(height: 8),
                       _SimpleBar('Total deudas', state.totalDebt, state.totalLiquid + state.totalDebt, kRed),
                       const Divider(height: 24),
@@ -115,8 +125,6 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
-
-                // Recent transactions
                 const SectionHeader(title: 'Movimientos recientes'),
                 FCard(
                   padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
@@ -135,7 +143,7 @@ class DashboardScreen extends ConsumerWidget {
                 GestureDetector(
                   onTap: () => context.go('/transactions'),
                   child: const Center(
-                    child: Text('Ver todos los movimientos →',
+                    child: Text('Ver todos los movimientos ->',
                       style: TextStyle(color: kBrand, fontSize: 13)),
                   ),
                 ),
@@ -249,12 +257,12 @@ class _TxRow extends StatelessWidget {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(tx.detail, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: kText),
                 overflow: TextOverflow.ellipsis),
-              Text('${tx.category?.name ?? ''} · ${tx.account?.name ?? ''}',
+              Text('${tx.category?.name ?? ""} - ${tx.account?.name ?? ""}',
                 style: const TextStyle(fontSize: 11, color: kMuted)),
             ]),
           ),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('${isIncome ? '+' : '-'}${fmtCompact(tx.amount)}',
+            Text('${isIncome ? "+" : "-"}${fmtCompact(tx.amount)}',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
             Text(fmtDate(tx.transactionDate),
               style: const TextStyle(fontSize: 10, color: kMuted)),
@@ -265,7 +273,6 @@ class _TxRow extends StatelessWidget {
   }
 }
 
-// ─── Add Transaction Bottom Sheet ─────────────────────────────────────────────
 void _showAddTransactionSheet(BuildContext context, WidgetRef ref) {
   showModalBottomSheet(
     context: context,
@@ -291,7 +298,7 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
   final _amountCtrl = TextEditingController();
   String? _categoryId;
   String? _accountId;
-  DateTime _date = DateTime.now();
+  final DateTime _date = DateTime.now();
   bool _loading = false;
 
   @override
@@ -308,14 +315,11 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Handle
           Center(child: Container(width: 36, height: 4,
             decoration: BoxDecoration(color: kBorder, borderRadius: BorderRadius.circular(4)))),
           const SizedBox(height: 16),
           const Text('Nuevo movimiento', style: kTitle),
           const SizedBox(height: 16),
-
-          // Type tabs
           Row(children: ['income', 'expense'].map((t) => Expanded(
             child: GestureDetector(
               onTap: () => setState(() { _type = t; _categoryId = null; }),
@@ -328,7 +332,7 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
                   color: _type == t ? (t == 'income' ? kBrand : kRed).withOpacity(0.1) : Colors.transparent,
                 ),
                 child: Center(child: Text(
-                  t == 'income' ? '↑ Ingreso' : '↓ Egreso',
+                  t == 'income' ? 'Ingreso' : 'Egreso',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                     color: _type == t ? (t == 'income' ? kBrand : kRed) : kMuted),
                 )),
@@ -336,8 +340,6 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
             ),
           )).toList()),
           const SizedBox(height: 14),
-
-          // Amount
           TextField(
             controller: _amountCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -348,16 +350,14 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
           TextField(
             controller: _detailCtrl,
             style: const TextStyle(color: kText),
-            decoration: const InputDecoration(labelText: 'Descripción'),
+            decoration: const InputDecoration(labelText: 'Descripcion'),
           ),
           const SizedBox(height: 12),
-
-          // Category dropdown
           DropdownButtonFormField<String>(
             value: _categoryId,
             dropdownColor: kSurface,
             style: const TextStyle(color: kText, fontSize: 13),
-            decoration: const InputDecoration(labelText: 'Categoría'),
+            decoration: const InputDecoration(labelText: 'Categoria'),
             items: cats.map((c) => DropdownMenuItem(
               value: c.id,
               child: Text('${c.icon} ${c.name}'),
@@ -365,13 +365,11 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
             onChanged: (v) => setState(() => _categoryId = v),
           ),
           const SizedBox(height: 12),
-
-          // Account dropdown
           DropdownButtonFormField<String>(
             value: _accountId,
             dropdownColor: kSurface,
             style: const TextStyle(color: kText, fontSize: 13),
-            decoration: const InputDecoration(labelText: 'Cuenta / Almacén'),
+            decoration: const InputDecoration(labelText: 'Cuenta / Almacen'),
             items: accounts.map((a) => DropdownMenuItem(
               value: a.id,
               child: Text(a.name),
@@ -379,8 +377,6 @@ class _AddTransactionSheetState extends ConsumerState<_AddTransactionSheet> {
             onChanged: (v) => setState(() => _accountId = v),
           ),
           const SizedBox(height: 20),
-
-          // Submit
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(

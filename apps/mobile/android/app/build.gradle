@@ -1,0 +1,58 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+def localProperties = new Properties()
+def localPropertiesFile = new File(rootDir, "local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader("UTF-8") { reader -> localProperties.load(reader) }
+}
+def flutterVersionCode = localProperties.getProperty("versionCode") ?: "1"
+def flutterVersionName = localProperties.getProperty("versionName") ?: "1.0"
+android {
+    namespace "com.blacksong.flujo"
+    compileSdk 36
+    buildToolsVersion "34.0.0"
+    ndkVersion "27.0.12077973"
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+    sourceSets {
+        main.java.srcDirs += "src/main/kotlin"
+    }
+signingConfigs {
+        release {
+            storeFile file("flujo-release.jks")
+            storePassword "960308"
+            keyAlias "flujo"
+            keyPassword "960308"
+        }
+    }
+    defaultConfig {
+        applicationId "com.blacksong.flujo"
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion 36
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+        multiDexEnabled true
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
+    }
+    lintOptions {
+        abortOnError false
+    }
+}
+flutter {
+    source "../.."
+}
+dependencies {
+    implementation "androidx.multidex:multidex:2.0.1"
+}

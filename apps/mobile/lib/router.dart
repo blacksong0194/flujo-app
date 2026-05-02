@@ -13,16 +13,29 @@ import 'screens/reports/reports_screen.dart';
 import 'screens/settings/settings_screen.dart';
 import 'screens/pending/pending_screen.dart';
 import 'widgets/common/main_shell.dart';
+import 'screens/recurring/recurring_screen.dart';
+
+// Notifier que escucha cambios de sesión de Supabase
+class _AuthNotifier extends ChangeNotifier {
+  _AuthNotifier() {
+    Supabase.instance.client.auth.onAuthStateChange.listen((_) {
+      notifyListeners();
+    });
+  }
+}
+
+final _authNotifier = _AuthNotifier();
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/dashboard',
+    refreshListenable: _authNotifier,
     redirect: (context, state) {
       final session = Supabase.instance.client.auth.currentSession;
       final isAuth  = session != null;
       final inAuth  = state.matchedLocation.startsWith('/auth');
       if (!isAuth && !inAuth) return '/auth/login';
-      if (isAuth && inAuth) return '/dashboard';
+      if (isAuth && inAuth)  return '/dashboard';
       return null;
     },
     routes: [
@@ -39,6 +52,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/goals',        builder: (_, __) => const GoalsScreen()),
           GoRoute(path: '/reports',      builder: (_, __) => const ReportsScreen()),
           GoRoute(path: '/settings',     builder: (_, __) => const SettingsScreen()),
+	GoRoute(path: '/recurring', builder: (_, __) => const RecurringScreen()),
         ],
       ),
     ],

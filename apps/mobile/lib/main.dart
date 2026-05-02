@@ -3,15 +3,29 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:app_links/app_links.dart';
 import 'router.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
 
-const supabaseUrl = String.fromEnvironment('SUPABASE_URL', defaultValue: 'https://YOUR_PROJECT.supabase.co');
-const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: 'YOUR_ANON_KEY');
+const supabaseUrl = 'https://ipkhbbjwoaikwsjdjqzi.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwa2hiYmp3b2Fpa3dzamRqcXppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4OTAxNzYsImV4cCI6MjA5MjQ2NjE3Nn0.TaF4ipyDXGn4yVlcdoEP2IFTMkG46SO_C9INe32zEas';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+
+  // Capturar deep links para Google OAuth callback
+  final appLinks = AppLinks();
+  appLinks.uriLinkStream.listen((uri) {
+    final uriStr = uri.toString();
+    if (uriStr.contains('login-callback') ||
+        uriStr.contains('access_token') ||
+        uriStr.contains('code=')) {
+      Supabase.instance.client.auth.getSessionFromUrl(uri);
+    }
+  });
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -25,6 +39,8 @@ Future<void> main() async {
     DeviceOrientation.portraitDown,
   ]);
 
+  await initializeDateFormatting('es', null);
+  Intl.defaultLocale = 'es_DO';
   runApp(const ProviderScope(child: FlujoApp()));
 }
 
@@ -66,7 +82,7 @@ class FlujoApp extends ConsumerWidget {
         outline: surface2,
       ),
       textTheme: dmSans,
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: surface,
         elevation: 0,
         shape: RoundedRectangleBorder(

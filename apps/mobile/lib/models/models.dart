@@ -1,5 +1,4 @@
-// ─── Account ─────────────────────────────────────────────────────────────────
-class Account {
+﻿class Account {
   final String id;
   final String userId;
   final String name;
@@ -38,12 +37,11 @@ class Account {
   };
 }
 
-// ─── Category ─────────────────────────────────────────────────────────────────
 class Category {
   final String id;
   final String userId;
   final String name;
-  final int movementType; // 1=income, 2=expense
+  final int movementType;
   final String icon;
   final String color;
 
@@ -61,12 +59,11 @@ class Category {
     userId:       j['user_id'] ?? '',
     name:         j['name'] ?? '',
     movementType: j['movement_type'] ?? 2,
-    icon:         j['icon'] ?? '💰',
+    icon:         j['icon'] ?? '',
     color:        j['color'] ?? '#10b981',
   );
 }
 
-// ─── Transaction ──────────────────────────────────────────────────────────────
 class Transaction {
   final String id;
   final String userId;
@@ -75,10 +72,11 @@ class Transaction {
   final double amount;
   final String detail;
   final DateTime transactionDate;
-  final String type; // income | expense | transfer
+  final String type;
   final bool isRecurring;
   final Account? account;
   final Category? category;
+  final String? debtAccountId;
 
   const Transaction({
     required this.id,
@@ -92,6 +90,7 @@ class Transaction {
     required this.isRecurring,
     this.account,
     this.category,
+    this.debtAccountId,
   });
 
   factory Transaction.fromJson(Map<String, dynamic> j) => Transaction(
@@ -104,22 +103,22 @@ class Transaction {
     transactionDate: j['transaction_date'] != null ? DateTime.parse(j['transaction_date']) : DateTime.now(),
     type:            j['type'] ?? 'expense',
     isRecurring:     j['is_recurring'] ?? false,
-    account:  j['account']  != null ? Account.fromJson(j['account'])   : null,
-    category: j['category'] != null ? Category.fromJson(j['category']) : null,
+    account:        j['account']  != null ? Account.fromJson(j['account'])   : null,
+    category:       j['category'] != null ? Category.fromJson(j['category']) : null,
+    debtAccountId:  j['debt_account_id'],
   );
 
   Map<String, dynamic> toInsertJson() => {
-    'account_id':        accountId,
-    'category_id':       categoryId,
-    'amount':            amount,
-    'detail':            detail,
-    'transaction_date':  transactionDate.toIso8601String().split('T')[0],
-    'type':              type,
-    'is_recurring':      isRecurring,
+    'account_id':       accountId,
+    'category_id':      categoryId,
+    'amount':           amount,
+    'detail':           detail,
+    'transaction_date': transactionDate.toIso8601String().split('T')[0],
+    'type':             type,
+    'is_recurring':     isRecurring,
   };
 }
 
-// ─── Budget ───────────────────────────────────────────────────────────────────
 class Budget {
   final String id;
   final String userId;
@@ -150,7 +149,6 @@ class Budget {
   );
 }
 
-// ─── Goal ─────────────────────────────────────────────────────────────────────
 class Goal {
   final String id;
   final String userId;
@@ -193,7 +191,6 @@ class Goal {
   };
 }
 
-// ─── Monthly Summary ─────────────────────────────────────────────────────────
 class MonthlySummary {
   final double ingresos;
   final double egresos;
@@ -212,18 +209,17 @@ class MonthlySummary {
       t.transactionDate.year == year && t.transactionDate.month == month
     );
     final ing = filtered.where((t) => t.type == 'income').fold(0.0, (s, t) => s + t.amount);
-    final egr = filtered.where((t) => t.type == 'expense').fold(0.0, (s, t) => s + t.amount);
+    final egr = filtered.where((t) => t.type == 'expense').fold(0.0, (s, t) => s + t.amount.abs());
     final aho = (ing - egr).clamp(0.0, double.infinity);
     return MonthlySummary(
-      ingresos: ing,
-      egresos: egr,
-      ahorrado: aho,
+      ingresos:   ing,
+      egresos:    egr,
+      ahorrado:   aho,
       tasaAhorro: ing > 0 ? aho / ing : 0,
     );
   }
 }
 
-// --- PendingItem -------------------------------------------------------------
 class PendingItem {
   final String id;
   final String userId;
@@ -252,4 +248,68 @@ class PendingItem {
     dueDate:     j['due_date'] != null ? DateTime.parse(j['due_date']) : DateTime.now(),
     status:      j['status'] ?? 'pending',
   );
+}
+
+class RecurringPayment {
+  final String id;
+  final String userId;
+  final String name;
+  final double amount;
+  final String accountId;
+  final String? categoryId;
+  final int dayOfMonth;
+  final DateTime nextPaymentDate;
+  final DateTime? lastExecutedDate;
+  final bool isAuto;
+  final DateTime? autoDebitAt;
+  final String status;
+  final Account? account;
+  final Category? category;
+  final String? debtAccountId;
+
+  const RecurringPayment({
+    required this.id,
+    required this.userId,
+    required this.name,
+    required this.amount,
+    required this.accountId,
+    this.categoryId,
+    required this.dayOfMonth,
+    required this.nextPaymentDate,
+    this.lastExecutedDate,
+    required this.isAuto,
+    this.autoDebitAt,
+    required this.status,
+    this.account,
+    this.category,
+    this.debtAccountId,
+  });
+
+  factory RecurringPayment.fromJson(Map<String, dynamic> j) => RecurringPayment(
+    id:               j['id'] ?? '',
+    userId:           j['user_id'] ?? '',
+    name:             j['name'] ?? '',
+    amount:           (j['amount'] as num? ?? 0).toDouble(),
+    accountId:        j['account_id'] ?? '',
+    categoryId:       j['category_id'],
+    dayOfMonth:       j['day_of_month'] ?? 1,
+    nextPaymentDate:  DateTime.parse(j['next_payment_date']),
+    lastExecutedDate: j['last_executed_date'] != null ? DateTime.parse(j['last_executed_date']) : null,
+    isAuto:           j['is_auto'] ?? false,
+    autoDebitAt:      j['auto_debit_at'] != null ? DateTime.parse(j['auto_debit_at']) : null,
+    status:           j['status'] ?? 'active',
+    account:       j['account']  != null ? Account.fromJson(j['account'])   : null,
+    category:      j['category'] != null ? Category.fromJson(j['category']) : null,
+    debtAccountId: j['debt_account_id'],
+  );
+
+  bool get isPending => status == 'active' &&
+      nextPaymentDate.isBefore(DateTime.now().add(const Duration(days: 1)));
+
+  bool get isInEditWindow => autoDebitAt != null &&
+      DateTime.now().isBefore(autoDebitAt!);
+
+  Duration get timeLeftInWindow => autoDebitAt != null
+      ? autoDebitAt!.difference(DateTime.now())
+      : Duration.zero;
 }

@@ -5,6 +5,7 @@ import '../../services/theme.dart';
 import '../../widgets/common/widgets.dart';
 import '../../widgets/modals/account_modal.dart';
 import '../../models/models.dart';
+import '../../widgets/modals/debt_modal.dart';
 
 class AccountsScreen extends ConsumerWidget {
   const AccountsScreen({super.key});
@@ -46,7 +47,7 @@ class AccountsScreen extends ConsumerWidget {
         if (debts.isNotEmpty) ...[
           const SizedBox(height: 10),
           const SectionHeader(title: 'Deudas y Obligaciones'),
-          ...debts.map((a) => _AccountTile(account: a, isDebt: true)),
+          ...debts.map((a) => _DebtTile(account: a)),
         ],
       ]),
     );
@@ -97,3 +98,74 @@ class _AccountTile extends StatelessWidget {
     );
   }
 }
+
+class _DebtTile extends StatelessWidget {
+  final Account account;
+  const _DebtTile({required this.account});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: FCard(
+        borderTop: kRed,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                color: kRed.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10)),
+              child: const Icon(Icons.warning_amber_rounded, color: kRed, size: 18)),
+            const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(account.name,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: kText)),
+              Text(account.type,
+                style: const TextStyle(fontSize: 11, color: kMuted)),
+            ])),
+            Text(fmtCompact(account.balance),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kRed)),
+          ]),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: GestureDetector(
+              onTap: () => showDialog(
+                context: context,
+                builder: (_) => DebtModal(debtAccount: account),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: kBrand.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: kBrand.withOpacity(0.3)),
+                ),
+                child: const Center(child: Text('↑ Pagar deuda',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kBrand))),
+              ),
+            )),
+            const SizedBox(width: 8),
+            Expanded(child: GestureDetector(
+              onTap: () => showDialog(
+                context: context,
+                builder: (_) => DebtModal(debtAccount: account),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: kRed.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: kRed.withOpacity(0.3)),
+                ),
+                child: const Center(child: Text('↓ Nueva deuda',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kRed))),
+              ),
+            )),
+          ]),
+        ]),
+      ),
+    );
+  }
+}
+

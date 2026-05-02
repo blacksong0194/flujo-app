@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/theme.dart';
+import '../../providers/finance_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -24,7 +26,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text.trim(),
       );
-      if (mounted) context.go('/dashboard');
+      if (mounted) {
+        await ref.read(financeProvider.notifier).fetchAll();
+        context.go('/dashboard');
+      }
     } on AuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -35,6 +40,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) setState(() => _loading = false);
     }
   }
+
+  Future<void> _loginWithGoogle() async {
+  setState(() => _loading = true);
+  try {
+    await Supabase.instance.client.auth.signInWithOAuth(
+      OAuthProvider.google,
+      redirectTo: 'com.blacksong.flujo://login-callback',
+      authScreenLaunchMode: LaunchMode.externalApplication,
+    );
+  } on AuthException catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message), backgroundColor: kRed),
+      );
+    }
+  } finally {
+    if (mounted) setState(() => _loading = false);
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -96,7 +120,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              // Submit
+              // Botón login
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -107,11 +131,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     : const Text('Iniciar sesión'),
                 ),
               ),
+              const SizedBox(height: 16),
+              // Divider
+              Row(children: [
+                const Expanded(child: Divider(color: Color(0xFF2A2D3E))),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  child: Text('o continúa con',
+                    style: TextStyle(color: kMuted, fontSize: 12)),
+                ),
+                const Expanded(child: Divider(color: Color(0xFF2A2D3E))),
+              ]),
+              const SizedBox(height: 16),
+              // Botón Google
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _loading ? null : _loginWithGoogle,
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF2A2D3E)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Text('G', style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold,
+                    color: Colors.white)),
+                  label: const Text('Continuar con Google',
+                    style: TextStyle(color: Colors.white, fontSize: 15)),
+                ),
+              ),
               const SizedBox(height: 24),
+              // Registro
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('¿No tienes cuenta? ', style: TextStyle(color: kMuted)),
+                  const Text('¿No tienes cuenta? ',
+                    style: TextStyle(color: kMuted)),
                   GestureDetector(
                     onTap: () => context.go('/auth/register'),
                     child: const Text('Regístrate',
