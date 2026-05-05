@@ -179,7 +179,7 @@ class FinanceNotifier extends Notifier<FinanceState> {
     if (accountId != null) {
       final account = state.accounts.firstWhere((a) => a.id == accountId);
       await _client.from('accounts')
-          .update({'balance': (account.balance + amount)})
+          .update({'balance': account.balance + amount})
           .eq('id', accountId);
     }
     await fetchAll();
@@ -192,10 +192,14 @@ class FinanceNotifier extends Notifier<FinanceState> {
     await _client.from('accounts').update({'balance': from.balance - amount}).eq('id', fromAccountId);
     final user = _client.auth.currentUser!;
     await _client.from('transactions').insert({
-      'user_id': user.id, 'account_id': fromAccountId, 'category_id': null,
-      'amount': -amount, 'detail': 'Pago a ${debt.name}',
+      'user_id':          user.id,
+      'account_id':       fromAccountId,
+      'category_id':      null,
+      'amount':           -amount,
+      'detail':           'Pago a ${debt.name}',
       'transaction_date': DateTime.now().toIso8601String().split('T')[0],
-      'type': 'expense', 'is_recurring': false,
+      'type':             'expense',
+      'is_recurring':     false,
     });
     await fetchAll();
   }
@@ -207,10 +211,14 @@ class FinanceNotifier extends Notifier<FinanceState> {
     await _client.from('accounts').update({'balance': to.balance + amount}).eq('id', toAccountId);
     final user = _client.auth.currentUser!;
     await _client.from('transactions').insert({
-      'user_id': user.id, 'account_id': toAccountId, 'category_id': null,
-      'amount': amount, 'detail': 'Nueva deuda: ${debt.name}',
+      'user_id':          user.id,
+      'account_id':       toAccountId,
+      'category_id':      null,
+      'amount':           amount,
+      'detail':           'Nueva deuda: ${debt.name}',
       'transaction_date': DateTime.now().toIso8601String().split('T')[0],
-      'type': 'income', 'is_recurring': false,
+      'type':             'income',
+      'is_recurring':     false,
     });
     await fetchAll();
   }
@@ -235,9 +243,16 @@ class FinanceNotifier extends Notifier<FinanceState> {
     await _client.from('goals').update({'current_amount': newAmount}).eq('id', id);
     state = state.copyWith(
       goals: state.goals.map((g) => g.id == id
-          ? Goal(id: g.id, userId: g.userId, name: g.name,
-              description: g.description, targetAmount: g.targetAmount,
-              currentAmount: newAmount, targetDate: g.targetDate, color: g.color)
+          ? Goal(
+              id:            g.id,
+              userId:        g.userId,
+              name:          g.name,
+              description:   g.description,
+              targetAmount:  g.targetAmount,
+              currentAmount: newAmount,
+              targetDate:    g.targetDate,
+              color:         g.color,
+            )
           : g).toList(),
     );
   }
@@ -259,46 +274,45 @@ class FinanceNotifier extends Notifier<FinanceState> {
 
   Future<void> addPendingItem(Map<String, dynamic> data) async {
     final user = _client.auth.currentUser!;
-    final res = await _client.from('pending_payments').insert({...data, 'user_id': user.id}).select().single();
+    final res = await _client.from('pending_payments')
+        .insert({...data, 'user_id': user.id})
+        .select()
+        .single();
     state = state.copyWith(pendingItems: [...state.pendingItems, PendingItem.fromJson(res)]);
   }
 
-  Future<void> markPendingCollected(String id, String accountId) async {
-  final user = _client.auth.currentUser!;
-  final item = state.pendingItems.firstWhere((p) => p.id == id);
+  // FIX: 'description' -> 'detail', 'date' -> 'transaction_date', agrega paidAmount y is_recurring
+  Future<void> markPendingCollected(String id, String accountId, double paidAmount) async {
+    final user = _client.auth.currentUser!;
+    final item = state.pendingItems.firstWhere((p) => p.id == id);
+    final isFullyPaid = paidAmount >= item.amount;
 
-  await _client.from('pending_payments')
-      .update({'status': 'collected'}).eq('id', id);
+    await _client.from('transactions').insert({
+      'user_id':          user.id,
+      'account_id':       accountId,
+      'category_id':      null,
+      'amount':           paidAmount,
+      'type':             'income',
+      'detail':           'Cobro: ${item.debtorName} - ${item.description}',
+      'transaction_date': DateTime.now().toIso8601String().split('T')[0],
+      'is_recurring':     false,
+    });
 
-  await _client.from('transactions').insert({
-    'user_id':     user.id,
-    'account_id':  accountId,
-    'category_id': null,
-    'amount':      item.amount,
-    'type':        'income',
-    'description': 'Cobro: ${item.debtorName} - ${item.description}',
-    'date':        DateTime.now().toIso8601String().split('T')[0],
-  });
+    final acc = state.accounts.firstWhere((a) => a.id == accountId);
+    await _client.from('accounts')
+        .update({'balance': acc.balance + paidAmount})
+        .eq('id', accountId);
 
-  final acc = state.accounts.firstWhere((a) => a.id == accountId);
-  await _client.from('accounts')
-      .update({'balance': acc.balance + item.amount}).eq('id', accountId);
+    if (isFullyPaid) {
+      await _client.from('pending_payments')
+          .update({'status': 'collected'}).eq('id', id);
+    } else {
+      await _client.from('pending_payments')
+          .update({'amount': item.amount - paidAmount}).eq('id', id);
+    }
 
-  state = state.copyWith(
-    pendingItems: state.pendingItems.map((p) => p.id == id
-        ? PendingItem(
-            id: p.id, userId: p.userId, debtorName: p.debtorName,
-            description: p.description, amount: p.amount,
-            dueDate: p.dueDate, status: 'collected')
-        : p).toList(),
-    accounts: state.accounts.map<Account>((a) => a.id == accountId
-        ? Account(
-            id: a.id, userId: a.userId, name: a.name,
-            type: a.type, balance: a.balance + item.amount,
-            color: a.color, isActive: a.isActive)
-        : a).toList(),
-  );
-}
+    await fetchAll();
+  }
 
   Future<void> deletePendingItem(String id) async {
     await _client.from('pending_payments').delete().eq('id', id);
@@ -369,12 +383,12 @@ class FinanceNotifier extends Notifier<FinanceState> {
       'is_recurring':     true,
     });
 
-    final nextMonth = rp.nextPaymentDate.month + 1;
-    final nextYear  = nextMonth > 12 ? rp.nextPaymentDate.year + 1 : rp.nextPaymentDate.year;
-    final adjustedMonth = nextMonth > 12 ? 1 : nextMonth;
+    final nextMonth      = rp.nextPaymentDate.month + 1;
+    final nextYear       = nextMonth > 12 ? rp.nextPaymentDate.year + 1 : rp.nextPaymentDate.year;
+    final adjustedMonth  = nextMonth > 12 ? 1 : nextMonth;
     final lastDayOfMonth = DateTime(nextYear, adjustedMonth + 1, 0).day;
-    final adjustedDay = rp.dayOfMonth > lastDayOfMonth ? lastDayOfMonth : rp.dayOfMonth;
-    final next = DateTime(nextYear, adjustedMonth, adjustedDay);
+    final adjustedDay    = rp.dayOfMonth > lastDayOfMonth ? lastDayOfMonth : rp.dayOfMonth;
+    final next           = DateTime(nextYear, adjustedMonth, adjustedDay);
 
     await _client.from('recurring_payments').update({
       'last_executed_date': DateTime.now().toIso8601String().split('T')[0],
