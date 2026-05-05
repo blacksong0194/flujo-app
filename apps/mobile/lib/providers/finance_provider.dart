@@ -263,16 +263,42 @@ class FinanceNotifier extends Notifier<FinanceState> {
     state = state.copyWith(pendingItems: [...state.pendingItems, PendingItem.fromJson(res)]);
   }
 
-  Future<void> markPendingCollected(String id) async {
-    await _client.from('pending_payments').update({'status': 'collected'}).eq('id', id);
-    state = state.copyWith(
-      pendingItems: state.pendingItems.map((p) => p.id == id
-          ? PendingItem(id: p.id, userId: p.userId, debtorName: p.debtorName,
-              description: p.description, amount: p.amount,
-              dueDate: p.dueDate, status: 'collected')
-          : p).toList(),
-    );
-  }
+  Future<void> markPendingCollected(String id, String accountId) async {
+  final user = _client.auth.currentUser!;
+  final item = state.pendingItems.firstWhere((p) => p.id == id);
+
+  await _client.from('pending_payments')
+      .update({'status': 'collected'}).eq('id', id);
+
+  await _client.from('transactions').insert({
+    'user_id':     user.id,
+    'account_id':  accountId,
+    'category_id': null,
+    'amount':      item.amount,
+    'type':        'income',
+    'description': 'Cobro: ${item.debtorName} - ${item.description}',
+    'date':        DateTime.now().toIso8601String().split('T')[0],
+  });
+
+  final acc = state.accounts.firstWhere((a) => a.id == accountId);
+  await _client.from('accounts')
+      .update({'balance': acc.balance + item.amount}).eq('id', accountId);
+
+  state = state.copyWith(
+    pendingItems: state.pendingItems.map((p) => p.id == id
+        ? PendingItem(
+            id: p.id, userId: p.userId, debtorName: p.debtorName,
+            description: p.description, amount: p.amount,
+            dueDate: p.dueDate, status: 'collected')
+        : p).toList(),
+    accounts: state.accounts.map<Account>((a) => a.id == accountId
+        ? Account(
+            id: a.id, userId: a.userId, name: a.name,
+            type: a.type, balance: a.balance + item.amount,
+            color: a.color, isActive: a.isActive)
+        : a).toList(),
+  );
+}
 
   Future<void> deletePendingItem(String id) async {
     await _client.from('pending_payments').delete().eq('id', id);

@@ -56,12 +56,23 @@ class DashboardScreen extends ConsumerWidget {
                 _PeriodNav(state: state, ref: ref),
                 const SizedBox(height: 16),
                 if (state.totalDebt > 0 && state.totalLiquid > 0)
-                  if (state.totalDebt / (state.totalLiquid + state.totalDebt) > 0.85)
-                    AlertBannerWidget(
-                      title: 'Ratio de endeudamiento critico',
-                      message: 'Tu deuda representa mas del 85% de tus activos',
-                      color: kRed,
-                    ),
+                    if (state.totalDebt / (state.totalLiquid + state.totalDebt) > 0.85)
+                      AlertBannerWidget(
+                        title: 'Ratio de endeudamiento critico',
+                        message: 'Tu deuda representa mas del 85% de tus activos',
+                        color: kRed,
+                      ),
+                  ...state.accounts
+                      .where((a) =>
+                          a.type != 'deuda' &&
+                          a.type != 'prestamo' &&
+                          a.isActive &&
+                          a.balance < 0)
+                      .map((a) => AlertBannerWidget(
+                            title: 'Saldo negativo: ${a.name}',
+                            message: 'Esta cuenta tiene un balance de ${fmtCurrency(a.balance)}',
+                            color: kRed,
+                          )),
                 GridView.count(
                   crossAxisCount: 2,
                   shrinkWrap: true,

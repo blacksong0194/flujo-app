@@ -32,7 +32,6 @@ class PendingScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // KPI row
           Row(children: [
             _KpiCard(label: 'Vencidos',   value: '$overdue',   color: kRed),
             const SizedBox(width: 8),
@@ -43,7 +42,6 @@ class PendingScreen extends ConsumerWidget {
             _KpiCard(label: 'Cobrados',   value: '$collected', color: kBrand),
           ]),
           const SizedBox(height: 12),
-          // Total banner
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
@@ -161,24 +159,7 @@ class _PendingCard extends StatelessWidget {
               const SizedBox(height: 8),
               if (!isCollected)
                 GestureDetector(
-                  onTap: () async {
-                    final ok = await showDialog<bool>(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        backgroundColor: kSurface,
-                        title: const Text('Confirmar cobro', style: TextStyle(color: kText, fontSize: 15)),
-                        content: Text('Marcar a ${item.debtorName} como cobrado?',
-                          style: const TextStyle(color: kMuted, fontSize: 13)),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(context, false),
-                            child: const Text('Cancelar', style: TextStyle(color: kMuted))),
-                          ElevatedButton(onPressed: () => Navigator.pop(context, true),
-                            child: const Text('Cobrar')),
-                        ],
-                      ),
-                    );
-                    if (ok == true) await ref.read(financeProvider.notifier).markPendingCollected(item.id);
-                  },
+                  onTap: () => _showCollectSheet(context, ref, item),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
@@ -251,6 +232,76 @@ void _showAddSheet(BuildContext context, WidgetRef ref) {
     context: context, isScrollControlled: true, backgroundColor: kSurface,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
     builder: (_) => _AddPendingSheet(ref: ref),
+  );
+}
+
+void _showCollectSheet(BuildContext context, WidgetRef ref, PendingItem item) {
+  final accounts = ref.read(financeProvider).accounts
+      .where((a) => a.type != 'deuda' && a.type != 'prestamo' && a.isActive)
+      .toList();
+  String? selectedId = accounts.isNotEmpty ? accounts.first.id : null;
+
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: kSurface,
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setState) => Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20,
+            MediaQuery.of(ctx).viewInsets.bottom + 28),
+        child: Column(mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Center(child: Container(width: 36, height: 4,
+              decoration: BoxDecoration(
+                  color: kBorder, borderRadius: BorderRadius.circular(4)))),
+          const SizedBox(height: 16),
+          const Text('Registrar cobro', style: kTitle),
+          const SizedBox(height: 4),
+          Text('${item.debtorName} · ${fmtCurrency(item.amount)}',
+              style: const TextStyle(color: kMuted, fontSize: 13)),
+          const SizedBox(height: 20),
+          const Text('Acreditar a cuenta',
+              style: TextStyle(color: kTextSub, fontSize: 13)),
+          const SizedBox(height: 8),
+          ...accounts.map((a) => GestureDetector(
+            onTap: () => setState(() => selectedId = a.id),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: selectedId == a.id ? kBrand.withOpacity(0.12) : kSurface2,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: selectedId == a.id ? kBrand.withOpacity(0.4) : kBorder),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(a.name, style: TextStyle(
+                      color: selectedId == a.id ? kBrand : kText,
+                      fontWeight: FontWeight.w600, fontSize: 14)),
+                  Text(fmtCurrency(a.balance),
+                      style: const TextStyle(color: kMuted, fontSize: 12)),
+                ]),
+            ),
+          )),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: selectedId == null ? null : () async {
+                Navigator.pop(ctx);
+                await ref.read(financeProvider.notifier)
+                    .markPendingCollected(item.id, selectedId!);
+              },
+              child: const Text('Confirmar cobro'),
+            ),
+          ),
+        ]),
+      ),
+    ),
   );
 }
 
